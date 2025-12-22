@@ -2,41 +2,91 @@
 
 A Nix-packaged distribution of **Aider**, pre-configured with the necessary build overrides for **Google Vertex AI** support on macOS and Linux.
 
+This package bridges the gap between Aider's rapid development cycle and the specific requirements of the Google Cloud SDK, ensuring a reproducible environment without the usual Python dependency conflicts.
+
 ## Features
-- **Nix Powered**: Fully reproducible build environment.
-- **Vertex Ready**: Includes patched dependencies for `google-cloud-sdk`, `watchfiles`, and `rpds-py`.
+- **Nix Powered**: Fully reproducible build environment for Intel/Silicon Macs and Linux.
+- **Vertex Ready**: Includes patched dependencies for `google-cloud-aiplatform`, `watchfiles`, and `rpds-py`.
+- **Cutting Edge**: Currently tracks **Aider v0.86.1** with Tree-sitter and Architect mode support.
 - **Transparent**: Passes all CLI arguments directly to the underlying Aider engine.
 
 ## Installation
 
-Run directly without installation:
-```bash
-nix run github:your-username/aider-vertex -- --model vertex_ai/gemini-1.5-pro
-```
+### Run directly (No installation)
+If you have Nix installed with Flakes enabled, you can run Aider-Vertex instantly:
 
-Or install to your Nix profile:
-```bash
-nix profile install github:andrey-stepantsov/aider-vertex
-```
+    nix run github:andrey-stepantsov/aider-vertex -- --architect --model vertex_ai/gemini-2.0-flash-exp
+
+### Install to Nix Profile
+To make the `aider-vertex` command available globally:
+
+    nix profile install github:andrey-stepantsov/aider-vertex
 
 ## Configuration
 
-Set the following environment variables to authenticate with Google Cloud:
+Before running, ensure you have authenticated with Google Cloud and set your project details.
 
-```bash
-export VERTEX_PROJECT="your-project-id"
-export VERTEX_LOCATION="us-central1"
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your-service-account.json"
-```
+### 1. Authenticate
+    gcloud auth login
+    gcloud auth application-default login
 
-## Examples
+### 2. Set Environment Variables
+    export VERTEX_PROJECT="your-project-id"
+    export VERTEX_LOCATION="us-central1"
 
-```bash
-# Chat with Gemini 1.5 Pro
-aider-vertex --model vertex_ai/gemini-1.5-pro
+*Note: Model availability depends on your `VERTEX_LOCATION`. Check the Vertex AI Console to confirm which models are enabled for your project.*
 
-# Use Architect mode with Gemini 2.0 Flash
-aider-vertex --architect --model vertex_ai/gemini-2.0-flash-exp
-```
+## Usage Examples
+
+**Chat with Gemini 1.5 Pro:**
+    aider-vertex --model vertex_ai/gemini-1.5-pro-002
+
+**Architect Mode with Gemini 2.0 (Experimental):**
+    aider-vertex --architect --model vertex_ai/gemini-2.0-flash-exp
+
+**Check Version:**
+    aider-vertex --version
+
+---
+
+## Maintenance (For the Maintainer)
+
+To update the underlying Aider engine or add new dependencies:
+
+1. Update version in `pyproject.toml`.
+2. Refresh the lockfile:
+    nix shell nixpkgs#poetry nixpkgs#python311 -c poetry update aider-chat
+3. Rebuild and Verify:
+    git add .
+    nix build . -L
+    ./result/bin/aider-vertex --version
+4. Release:
+    git tag v0.86.x
+    git push origin main --follow-tags
+
+---
+
+## License
+This project is licensed under the MIT License.
+
+## Future Iterations (Roadmap)
+The goal is to evolve Aider-Vertex from a simple wrapper into a robust AI research and development environment.
+
+🟢 Phase 1: Document Intelligence (Next Up)
+PDF Extraction: Integrate pypdf to allow Aider to "read" local PDF specifications and whitepapers.
+
+Office Support: Add python-docx to handle enterprise documentation.
+
+Pandoc Integration: Leverage nixpkgs#pandoc to convert complex documents into LLM-friendly Markdown.
+
+🟡 Phase 2: Enhanced Web Research
+Dynamic Scraping: Evaluate playwright for Javascript-heavy documentation sites.
+
+Search Integration: Explore adding search tool capabilities for real-time library discovery.
+
+🔴 Phase 3: Vertex-Native Extensions
+Image Context: Optimize the pipeline for sending local screenshots and diagrams to Gemini's multi-modal endpoint.
+
+Context Caching: Implement logic to leverage Vertex AI's context caching for massive codebases (reducing token costs).
 
 
