@@ -15,14 +15,14 @@
       pkgs = nixpkgs.legacyPackages.${system};
       p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
       
-      # REVISED: Simpler license injection to satisfy setuptools
+      # REVISED: Injecting the license as a proper PEP 621 table
       googleFix = old: {
         postPatch = (old.postPatch or "") + ''
           if [ -f pyproject.toml ]; then
-            # Remove any existing license lines
+            # Remove any existing problematic license declarations
             sed -i '/license = /d' pyproject.toml
-            # Inject a simple string license under [project]
-            sed -i '/\[project\]/a license = "Apache-2.0"' pyproject.toml
+            # Inject the license table under the [project] section
+            sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
           fi
         '';
       };
@@ -35,7 +35,6 @@
         nativeBuildInputs = [ pkgs.makeWrapper ];
 
         overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
-          # Apply the fix to the Google stack
           google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
           google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
           google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
