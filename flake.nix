@@ -15,13 +15,10 @@
       pkgs = nixpkgs.legacyPackages.${system};
       p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
       
-      # REVISED: Injecting the license as a proper PEP 621 table
       googleFix = old: {
         postPatch = (old.postPatch or "") + ''
           if [ -f pyproject.toml ]; then
-            # Remove any existing problematic license declarations
             sed -i '/license = /d' pyproject.toml
-            # Inject the license table under the [project] section
             sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
           fi
         '';
@@ -32,9 +29,8 @@
         python = pkgs.python311;
         preferWheels = true;
 
-        nativeBuildInputs = [ pkgs.makeWrapper ];
-
         overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
+          # Keep these to ensure the Google SDK actually compiles in Nix
           google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
           google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
           google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -60,13 +56,6 @@
 
           watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
         });
-
-        postFixup = ''
-          wrapProgram $out/bin/aider-vertex \
-            --set VERTEX_PROJECT "gen-lang-client-0140206225" \
-            --set VERTEX_LOCATION "us-central1" \
-            --add-flags "--model vertex_ai/gemini-2.5-pro"
-        '';
       };
     };
 }

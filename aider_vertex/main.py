@@ -2,8 +2,8 @@ import sys
 from aider.main import main as aider_main
 
 def main():
-    # No more complex logic here. Nix has already set the ENV 
-    # and added the --model flag to the command line.
+    # No interception, no hardcoding.
+    # Just pass whatever the user typed directly to the aider engine.
     aider_main()
 
 if __name__ == "__main__":
