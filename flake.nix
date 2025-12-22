@@ -37,28 +37,24 @@
           google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
           google-crc32c = prev.google-crc32c.overridePythonAttrs googleFix;
 
-          # Probe for the final rpds-py hash (ALMOST THERE)
+          # 1. FIXED: Applied verified rpds-py vendor hash
           rpds-py = prev.rpds-py.overridePythonAttrs (old: {
+            preferWheel = false; 
+            src = pkgs.fetchPypi {
+              pname = "rpds_py";
+              version = "0.22.3";
+              hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
+            };
             cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
-              inherit (old) src;
+              inherit (final.rpds-py) src;
               name = "rpds-py-vendor";
-              hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+              hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
             };
           });
 
-          # Corrected watchfiles vendor bundle with your verified hash
-          watchfiles = pkgs.python311Packages.watchfiles.overridePythonAttrs (old: {
-            version = "1.0.0";
-            src = pkgs.fetchPypi {
-              pname = "watchfiles";
-              version = "1.0.0";
-              hash = "sha256-N1ZshEyc47XeuWT+GiM3jldedLEUYY0hH72o9Z17Xas=";
-            };
-            cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
-              inherit (old) src;
-              name = "watchfiles-1.0.0-vendor";
-              hash = "sha256-PjS/lr1RcoTopzitvnlLhbowHI98AvJgQSpvucsMJIg=";
-            };
+          # 2. FIXED: Stay on Wheel bypass for stability
+          watchfiles = prev.watchfiles.overridePythonAttrs (old: {
+            preferWheel = true;
           });
         });
       };

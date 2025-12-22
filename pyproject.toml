@@ -1,21 +1,32 @@
 [tool.poetry]
 name = "aider-vertex"
 version = "0.1.0"
-description = "Aider with Google Vertex AI support"
+description = "Aider-Vertex: Gemini code editing with Vertex AI"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
-package-mode = true
+
+# This ensures the build backend finds your code in the subdirectory
+packages = [
+    { include = "aider_vertex" }
+]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = "^3.11"
 aider-chat = "0.71.1"
-watchfiles = "1.0.0"
-google-cloud-aiplatform = ">=1.70.0"
-anthropic = { extras = ["vertex"], version = "*" }
+google-cloud-aiplatform = "1.115.0"
+google-genai = "1.2.0"
+# These are often required as sub-dependencies for Vertex AI
+google-api-core = "*"
+google-cloud-core = "*"
+google-cloud-storage = "*"
 
-[tool.poetry.scripts]
-aider-vertex = 'aider.main:main'
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+# This creates the 'aider-vertex' command when you install the package
+[tool.poetry.scripts]
+aider-vertex = "aider_vertex.main:main"
