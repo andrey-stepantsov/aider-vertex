@@ -1,7 +1,0 @@
-{
-  "name": "aider-vertex",
-  "packages": [
-    "python@3.11",
-    "poetry@latest"
-  ]
-}
