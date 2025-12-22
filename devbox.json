@@ -2,16 +2,14 @@
   "packages": [
     "python@3.11",
     "poetry@latest",
-    "google-cloud-sdk@latest",
-    "shellcheck@latest"
+    "google-cloud-sdk@latest"
   ],
-  "env": {
-    "PYTHONPATH": "."
-  },
+  "env_from": ".env",
   "shell": {
     "init_hook": [
-      "echo 'Aider-Vertex Devbox environment loaded'",
-      "if [ -f .env ]; then source .env; fi"
+      "poetry install",
+      "source $(poetry env info --path)/bin/activate",
+      "echo 'Vertex AI Lab Environment Ready'"
     ]
   }
 }

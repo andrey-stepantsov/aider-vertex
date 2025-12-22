@@ -1,16 +1,12 @@
 [tool.poetry]
 name = "aider-vertex"
-version = "0.69.2"
+version = "0.1.0"
 description = "Aider with Vertex AI support"
-authors = ["Andrey Stepantsov"]
+authors = ["Your Name"]
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.11"
-aider-chat = "*"
-google-cloud-aiplatform = "*"
+python = ">=3.11,<3.12"
+aider-chat = ">=0.69.1"
+google-cloud-aiplatform = ">=1.70.0"
 anthropic = { extras = ["vertex"], version = "*" }
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
