@@ -1,14 +1,13 @@
 import os
 import sys
-from aider.main import main as aider_main
 
 def main():
     print("Starting Aider-Vertex...")
     
-    # Simple logic to extract our custom flags
     args = sys.argv[1:]
     new_args = []
     
+    # Handle custom flags before Aider even loads
     for arg in args:
         if arg.startswith("--vertex-project="):
             os.environ["VERTEX_PROJECT"] = arg.split("=")[1]
@@ -17,9 +16,11 @@ def main():
         else:
             new_args.append(arg)
 
-    # Replace sys.argv so aider doesn't see the custom flags
+    # Clean the global sys.argv
     sys.argv = [sys.argv[0]] + new_args
     
+    # NOW import and run aider
+    from aider.main import main as aider_main
     aider_main()
 
 if __name__ == "__main__":
