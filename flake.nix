@@ -65,7 +65,7 @@
           wrapProgram $out/bin/aider-vertex \
             --set VERTEX_PROJECT "gen-lang-client-0140206225" \
             --set VERTEX_LOCATION "us-central1" \
-            --add-flags "--model vertex_ai/gemini-1.5-pro"
+            --add-flags "--model vertex_ai/gemini-2.5-pro"
         '';
       };
     };
