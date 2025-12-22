@@ -1,15 +1,7 @@
 {
+  "name": "aider-vertex",
   "packages": [
     "python@3.11",
-    "poetry@latest",
-    "google-cloud-sdk@latest"
-  ],
-  "env_from": ".env",
-  "shell": {
-    "init_hook": [
-      "poetry install",
-      "source $(poetry env info --path)/bin/activate",
-      "echo 'Vertex AI Lab Environment Ready'"
-    ]
-  }
+    "poetry@latest"
+  ]
 }
