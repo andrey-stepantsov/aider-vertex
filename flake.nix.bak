@@ -1,0 +1,44 @@
+{
+  description = "Aider-Vertex: Ground-up build using Nixpkgs curated environment";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+  };
+
+  outputs = { self, nixpkgs }:
+    let
+      system = "aarch64-darwin"; # Set for your Mac
+      pkgs = nixpkgs.legacyPackages.${system};
+      
+      # Define the python environment with the specific Google and Aider tools
+      pythonEnv = pkgs.python311.withPackages (ps: with ps; [
+        aider-chat
+        google-cloud-aiplatform
+        google-crc32c
+        anthropic
+      ]);
+    in {
+      packages.${system}.default = pkgs.stdenv.mkDerivation {
+        name = "aider-vertex";
+        version = "0.1.0";
+        src = ./.;
+
+        nativeBuildInputs = [ pkgs.makeWrapper ];
+
+        # We don't need a build phase, just a wrapping phase
+        installPhase = ''
+          mkdir -p $out/bin
+          makeWrapper ${pythonEnv}/bin/aider $out/bin/aider-vertex \
+            --set PYTHONPATH "${pythonEnv}/${pkgs.python311.sitePackages}"
+        '';
+      };
+
+      devShells.${system}.default = pkgs.mkShell {
+        buildInputs = [ pythonEnv ];
+        shellHook = ''
+          if [ -f .env ]; then export $(cat .env | xargs); fi
+          echo "Aider-Vertex Environment Ready"
+        '';
+      };
+    };
+}
