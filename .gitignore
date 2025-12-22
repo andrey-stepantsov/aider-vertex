@@ -1,0 +1,22 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+dist/
+build/
+
+# --- Nix / Devbox ---
+.devbox/
+.direnv/
+result
+
+# --- Project Specific ---
+.env
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v3/
+
+# --- System ---
+.DS_Store

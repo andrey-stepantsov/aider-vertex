@@ -1,0 +1,14 @@
+# Ignore history and large artifacts
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v3/
+poetry.lock
+devbox.lock
+
+# Ignore project metadata Aider doesn't need to edit
+.gitignore
+.aiderignore
+README.md
+
+# Ignore the build result from Nix
+result/

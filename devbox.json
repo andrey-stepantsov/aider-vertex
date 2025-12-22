@@ -1,0 +1,17 @@
+{
+  "packages": [
+    "python@3.11",
+    "poetry@latest",
+    "google-cloud-sdk@latest",
+    "shellcheck@latest"
+  ],
+  "env": {
+    "PYTHONPATH": "."
+  },
+  "shell": {
+    "init_hook": [
+      "echo 'Aider-Vertex Devbox environment loaded'",
+      "if [ -f .env ]; then source .env; fi"
+    ]
+  }
+}
