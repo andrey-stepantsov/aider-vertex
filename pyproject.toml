@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aider-vertex"
-version = "0.1.0"
+version = "0.86.1"
 description = "Aider-Vertex: Gemini code editing with Vertex AI"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
@@ -11,8 +11,8 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-aider-chat = "0.71.1"
+python = ">=3.11,<3.13"
+aider-chat = "^0.86.1"
 google-cloud-aiplatform = "1.115.0"
 google-genai = "1.2.0"
 # These are often required as sub-dependencies for Vertex AI
