@@ -3,7 +3,7 @@ from aider.main import main as aider_main
 from importlib import metadata
 
 # Your wrapper version (synced with pyproject.toml)
-WRAPPER_VERSION = "1.0.0"
+WRAPPER_VERSION = "1.0.1"
 
 def get_aider_version():
     """Extracts the version of the underlying aider-chat package."""
