@@ -1,35 +1,27 @@
-import os
 import sys
+import os
 
-def main():
-    print("Starting Aider-Vertex...")
-    
-    # We create a brand new list and explicitly filter out our custom flags
-    # We also handle the values before they are deleted
-    clean_args = []
-    clean_args.append(sys.argv[0]) # Keep the program name
-    
+# AGGRESSIVE STRIP: Do this before ANY other code runs
+if any("vertex" in arg for arg in sys.argv):
+    filtered_args = [sys.argv[0]]
     for arg in sys.argv[1:]:
         if arg.startswith("--vertex-project="):
             os.environ["VERTEX_PROJECT"] = arg.split("=")[1]
         elif arg.startswith("--vertex-location="):
             os.environ["VERTEX_LOCATION"] = arg.split("=")[1]
-        elif "--vertex" in arg:
-            # Catch-all for any other vertex-related flag variants
-            pass
-        else:
-            clean_args.append(arg)
+        elif "vertex" not in arg:
+            filtered_args.append(arg)
+    sys.argv[:] = filtered_args
 
-    # REWRITE sys.argv entirely
-    sys.argv[:] = clean_args
-    
-    # Debug: Confirm what we are passing to Aider
-    # print(f"DEBUG: Args passed to Aider: {sys.argv}")
+def main():
+    # Force the model if not provided
+    if "--model" not in sys.argv:
+        sys.argv.extend(["--model", "vertex_ai/gemini-1.5-pro"])
+
+    print(f"Starting Aider-Vertex (Project: {os.environ.get('VERTEX_PROJECT', 'unset')})...")
     
     from aider.main import main as aider_main
     aider_main()
 
 if __name__ == "__main__":
     main()
-
-
