@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "aider-vertex"
-version = "0.86.1"
-description = "Aider-Vertex: Gemini code editing with Vertex AI"
-authors = ["Your Name <you@example.com>"]
+version = "1.0.0"
+description = "Nix wrapper for Aider (v0.86.1) with Vertex AI support"
+authors = ["Andrey Stepantsov <andrey.stepantosv@gmail.com>"]
 readme = "README.md"
 
 # This ensures the build backend finds your code in the subdirectory
