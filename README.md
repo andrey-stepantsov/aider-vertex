@@ -1,21 +1,42 @@
 # Aider-Vertex
 
-A specialized environment for [Aider](https://aider.chat/) with Google Vertex AI support, managed via Devbox and Poetry.
+A Nix-packaged distribution of **Aider**, pre-configured with the necessary build overrides for **Google Vertex AI** support on macOS and Linux.
 
-## 🔐 Credentials Setup
+## Features
+- **Nix Powered**: Fully reproducible build environment.
+- **Vertex Ready**: Includes patched dependencies for `google-cloud-sdk`, `watchfiles`, and `rpds-py`.
+- **Transparent**: Passes all CLI arguments directly to the underlying Aider engine.
 
-This project uses an external Service Account for security.
+## Installation
 
-1. Locate your Service Account JSON (e.g., `~/.config/aider/gen-lang-client-*.json`).
-2. Create a `.env` file in this root directory (this file is git-ignored):
-   ~~~bash
-   GOOGLE_APPLICATION_CREDENTIALS="/Users/stepants/.config/aider/your-key-file.json"
-   VERTEXAI_PROJECT="gen-lang-client-0140206225"
-   VERTEXAI_LOCATION="us-central1"
-   ~~~
+Run directly without installation:
+```bash
+nix run github:your-username/aider-vertex -- --model vertex_ai/gemini-1.5-pro
+```
 
-## 🚀 Development Workflow
+Or install to your Nix profile:
+```bash
+nix profile install github:andrey-stepantsov/aider-vertex
+```
 
-1. **Enter Environment**: Run `devbox shell`.
-2. **Install Deps**: Run `poetry install` inside the shell.
-3. **Run Test**: Execute `./test.sh` to verify Vertex AI connectivity.
+## Configuration
+
+Set the following environment variables to authenticate with Google Cloud:
+
+```bash
+export VERTEX_PROJECT="your-project-id"
+export VERTEX_LOCATION="us-central1"
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your-service-account.json"
+```
+
+## Examples
+
+```bash
+# Chat with Gemini 1.5 Pro
+aider-vertex --model vertex_ai/gemini-1.5-pro
+
+# Use Architect mode with Gemini 2.0 Flash
+aider-vertex --architect --model vertex_ai/gemini-2.0-flash-exp
+```
+
+
