@@ -107,7 +107,6 @@
                 }
               else prev.grpcio.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force ABI3 wheel for hf-xet (Rust package)
               hf-xet = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "hf_xet";
@@ -115,12 +114,12 @@
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
-                    dist = "cp37";  # Changed to cp37 (abi3)
-                    python = "cp37"; # Changed to cp37 (abi3)
-                    abi = "abi3";    # Changed to abi3
+                    dist = "cp37";
+                    python = "cp37";
+                    abi = "abi3";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder GGGG: CI will fail here first
-                    hash = "sha256-GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG=";
+                    # CORRECT HASH verified from logs
+                    hash = "sha256-bvqvGlqfw6UB0+ceiKa/68ae46cW0OcTqTHIuNkgA48=";
                   };
                 }
               else prev.hf-xet.overridePythonAttrs (old: { preferWheel = true; });
@@ -158,7 +157,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Still waiting for this!
+                    # Placeholder BBBB: The final failure!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
