@@ -48,40 +48,44 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
               # --- FIX: Broken Metadata ---
-              aiohappyeyeballs = prev.aiohappyeyeballs.overridePythonAttrs (old: {
-                preferWheel = true;
-              });
+              # Force manual wheel download for aiohappyeyeballs to bypass build error
+              aiohappyeyeballs = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "aiohappyeyeballs";
+                  version = "2.6.1";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "py3";
+                    python = "py3";
+                    # Placeholder CCCC: The CI will fail here first
+                    hash = "sha256-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=";
+                  };
+                }
+              else
+                prev.aiohappyeyeballs;
 
               # --- FIX: Hybrid Build Strategy ---
               
-              # 1. rpds-py
+              # 1. rpds-py (Fixed!)
               rpds-py = if pkgs.stdenv.isLinux then 
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "rpds_py";
                   version = "0.22.3";
                   format = "pyproject";
-                  
                   src = pkgs.fetchPypi {
                     inherit pname version;
                     hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
                   };
-
-                  nativeBuildInputs = with pkgs; [
-                    rustPlatform.cargoSetupHook
-                    rustPlatform.maturinBuildHook
-                  ];
-
+                  nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # CORRECT HASH (Extracted from your logs)
                     hash = "sha256-zpmgLLsNA3OzuaSBWoAZuA5nMg9mXWbY5qILE+7hucs=";
                   };
                 }
               else 
-                prev.rpds-py.overridePythonAttrs (old: {
-                  preferWheel = true;
-                });
+                prev.rpds-py.overridePythonAttrs (old: { preferWheel = true; });
 
               # 2. watchfiles
               watchfiles = if pkgs.stdenv.isLinux then
@@ -89,29 +93,20 @@
                   pname = "watchfiles";
                   version = "1.1.0";
                   format = "pyproject";
-
                   src = pkgs.fetchPypi {
                     inherit pname version;
-                    # Correct Source Hash
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
-
-                  nativeBuildInputs = with pkgs; [
-                    rustPlatform.cargoSetupHook
-                    rustPlatform.maturinBuildHook
-                  ];
-
+                  nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The CI will fail here NEXT.
+                    # Placeholder BBBB: Still waiting for this one!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
               else
-                prev.watchfiles.overridePythonAttrs (old: {
-                  preferWheel = true;
-                });
+                prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
             });
 
             postFixup = ''
