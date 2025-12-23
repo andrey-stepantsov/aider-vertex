@@ -201,6 +201,24 @@
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
+              # Force wheel for regex (metadata issue)
+              regex = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "regex";
+                  version = "2025.7.34"; # Matches log
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # Placeholder MMMM: CI will fail here next
+                    hash = "sha256-MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM=";
+                  };
+                }
+              else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
+
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
               rpds-py = if pkgs.stdenv.isLinux then 
@@ -234,7 +252,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The final failure!
+                    # Placeholder BBBB: Still waiting for this!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
