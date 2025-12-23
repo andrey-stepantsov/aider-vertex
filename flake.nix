@@ -5,6 +5,8 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     poetry2nix = {
       url = "github:nix-community/poetry2nix";
+      # This ensures poetry2nix uses the same nixpkgs as you,
+      # preventing version mismatches in the build tools.
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
