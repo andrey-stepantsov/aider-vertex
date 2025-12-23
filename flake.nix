@@ -102,11 +102,28 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # CORRECT HASH
                     hash = "sha256-yY4LdDSn+k4+Y/JQRW6u9SSZ+6WuZhxYzFtUd9EecYI=";
                   };
                 }
               else prev.grpcio.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Force wheel for hf-xet (Rust package missing maturin)
+              hf-xet = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "hf_xet";
+                  version = "1.1.7"; # From logs
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # Placeholder GGGG: CI will fail here first
+                    hash = "sha256-GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG=";
+                  };
+                }
+              else prev.hf-xet.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
