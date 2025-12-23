@@ -49,17 +49,23 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
               # --- FIX: Tree Sitter (Robust Fix) ---
-              # 1. preferWheel: Try to use binary if lockfile allows.
-              # 2. autoPatchelf: If wheel is used, fix linux linking.
-              # 3. setuptools/wheel: If source build triggers, these are required.
-              # 4. pkgs.tree-sitter: If source build triggers, this provides parser.h.
+              # Source builds require:
+              # 1. setuptools/wheel (build backend)
+              # 2. pkgs.tree-sitter (C headers)
+              # 3. Explicit CFLAGS to find those headers
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                
                 buildInputs = (old.buildInputs or []) ++ [ pkgs.tree-sitter ];
+                
+                # FORCE the compiler to find tree_sitter/parser.h
+                preBuild = (old.preBuild or "") + ''
+                  export CFLAGS="-I${pkgs.tree-sitter}/include $CFLAGS"
+                '';
               });
 
               tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
@@ -68,7 +74,13 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                
                 buildInputs = (old.buildInputs or []) ++ [ pkgs.tree-sitter ];
+                
+                # FORCE the compiler to find tree_sitter/parser.h
+                preBuild = (old.preBuild or "") + ''
+                  export CFLAGS="-I${pkgs.tree-sitter}/include $CFLAGS"
+                '';
               });
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
