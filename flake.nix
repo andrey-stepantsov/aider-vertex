@@ -179,8 +179,8 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder KKKK: CI will fail here next
-                    hash = "sha256-KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK=";
+                    # CORRECT HASH (Verified)
+                    hash = "sha256-Zm2/tuxoliwDOkUJQ97Ykb7S1U5nVeNeWDXWP09pMdU=";
                   };
                   passthru = { blas = pkgs.openblas; };
                 }
@@ -198,7 +198,7 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder LLLL
+                    # Placeholder LLLL: CI will fail here next
                     hash = "sha256-LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL=";
                   };
                 }
