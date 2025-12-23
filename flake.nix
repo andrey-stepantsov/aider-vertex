@@ -167,7 +167,6 @@
                 }
               else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for numpy + autoPatchelfHook + libs
               numpy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "numpy";
@@ -187,7 +186,6 @@
                 }
               else prev.numpy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for scipy + autoPatchelfHook + libs
               scipy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "scipy";
@@ -206,7 +204,6 @@
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Regex with source patch
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
@@ -225,12 +222,10 @@
                   nativeBuildInputs = [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
-
-              # Shapely needs libgfortran during build (imported via numpy)
-              shapely = prev.shapely.overridePythonAttrs (old: {
-                preBuild = ''
-                  export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
-                '';
+              
+              # FIX: Missing setuptools for tree-sitter-c-sharp
+              tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
               });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
@@ -266,7 +261,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The final failure!
+                    # Placeholder BBBB: Still waiting for this!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
