@@ -57,16 +57,32 @@
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # CORRECT HASH (Verified from logs)
                     hash = "sha256-80m6j0t1yyXJnFwthOmX5IUgTSkCqVl4ArA3HwkzH7g=";
                   };
                 }
               else
                 prev.aiohappyeyeballs.overridePythonAttrs (old: { preferWheel = true; });
 
+              # Force wheel for click to avoid flit_core metadata errors
+              click = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "click";
+                  version = "8.2.1"; # Verify version matches your lockfile
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "py3";
+                    python = "py3";
+                    # Placeholder DDDD: CI will fail here first
+                    hash = "sha256-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=";
+                  };
+                }
+              else
+                prev.click.overridePythonAttrs (old: { preferWheel = true; });
+
               # --- FIX: Hybrid Build Strategy ---
               
-              # 1. rpds-py (Fixed!)
+              # 1. rpds-py
               rpds-py = if pkgs.stdenv.isLinux then 
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "rpds_py";
@@ -92,21 +108,15 @@
                   pname = "watchfiles";
                   version = "1.1.0";
                   format = "pyproject";
-
                   src = pkgs.fetchPypi {
                     inherit pname version;
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
-
-                  nativeBuildInputs = with pkgs; [
-                    rustPlatform.cargoSetupHook
-                    rustPlatform.maturinBuildHook
-                  ];
-
+                  nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The build will fail here next!
+                    # Placeholder BBBB: Still waiting for this!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
