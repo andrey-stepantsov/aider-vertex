@@ -134,11 +134,26 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # CORRECT HASH verified from logs
                     hash = "sha256-TEQOoAOtEJJ6MFIakGLOELVHlZLopw2ifyHutFe0qcU=";
                   };
                 }
               else prev.jiter.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Force wheel for mslex (missing setuptools)
+              mslex = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "mslex";
+                  version = "1.3.0";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "py3";
+                    python = "py3";
+                    # Placeholder IIII: CI will fail here first
+                    hash = "sha256-IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII=";
+                  };
+                }
+              else prev.mslex.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -173,7 +188,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The build WILL fail here next (unless pydantic-core beats it to it)
+                    # Placeholder BBBB: Still waiting for this!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
