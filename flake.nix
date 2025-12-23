@@ -162,13 +162,12 @@
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # CORRECT HASH verified from logs
                     hash = "sha256-cay4odQu143dITodOmKLv4N/dYvSmZyR33zleXJGa98=";
                   };
                 }
               else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for numpy to avoid build errors
+              # Force wheel for numpy & mock BLAS attribute
               numpy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "numpy";
@@ -183,9 +182,27 @@
                     # Placeholder KKKK: CI will fail here next
                     hash = "sha256-KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK=";
                   };
+                  passthru = { blas = pkgs.openblas; };
                 }
               else prev.numpy.overridePythonAttrs (old: { preferWheel = true; });
 
+              # Force wheel for scipy (depends on numpy)
+              scipy = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "scipy";
+                  version = "1.15.3";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # Placeholder LLLL
+                    hash = "sha256-LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL=";
+                  };
+                }
+              else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
