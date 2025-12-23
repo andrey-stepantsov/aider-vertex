@@ -47,43 +47,41 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Tree Sitter (Force Manual Wheels on Linux) ---
-              # poetry2nix refuses to use wheels if they aren't in the lockfile.
-              # We manually define the derivation to bypass source compilation entirely.
+              # --- FIX: Tree Sitter (Force Manual ABI3 Wheels) ---
               
               tree-sitter-c-sharp = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "tree_sitter_c_sharp"; # Underscores for wheel filename
+                  pname = "tree_sitter_c_sharp"; 
                   version = "0.23.1";
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
-                    dist = "cp311";
-                    python = "cp311";
-                    abi = "cp311";
+                    dist = "cp39";      # Changed from cp311
+                    python = "cp39";    # Changed from cp311
+                    abi = "abi3";       # Changed from cp311 to abi3
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
                     # !!! PLACEHOLDER 1: Run build, get hash, replace here.
                     hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
-                  nativeBuildInputs = [ pkgs.autoPatchelfHook pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
                 }
               else prev.tree-sitter-c-sharp;
 
               tree-sitter-embedded-template = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "tree_sitter_embedded_template"; # Underscores for wheel filename
+                  pname = "tree_sitter_embedded_template"; 
                   version = "0.23.2";
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
-                    dist = "cp311";
-                    python = "cp311";
-                    abi = "cp311";
+                    dist = "cp39";      # Changed from cp311
+                    python = "cp39";    # Changed from cp311
+                    abi = "abi3";       # Changed from cp311 to abi3
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
                     # !!! PLACEHOLDER 2: Run build, get hash, replace here.
                     hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
-                  nativeBuildInputs = [ pkgs.autoPatchelfHook pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
                 }
               else prev.tree-sitter-embedded-template;
 
