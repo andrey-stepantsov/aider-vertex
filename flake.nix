@@ -86,17 +86,15 @@
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # CORRECT HASH
                     hash = "sha256-zyVpq9I9zoCZswD5tPqBkelYLdpzH9Uz2vVMRVFlhwg=";
                   };
                 }
               else prev.docstring-parser.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Pre-emptive fix for grpcio to avoid compilation issues
               grpcio = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "grpcio";
-                  version = "1.74.0"; # Matches log version
+                  version = "1.74.0"; 
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
@@ -104,8 +102,8 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder FFFF: This will be the next failure
-                    hash = "sha256-FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF=";
+                    # CORRECT HASH
+                    hash = "sha256-yY4LdDSn+k4+Y/JQRW6u9SSZ+6WuZhxYzFtUd9EecYI=";
                   };
                 }
               else prev.grpcio.overridePythonAttrs (old: { preferWheel = true; });
