@@ -34,7 +34,7 @@
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
-            preferWheels = pkgs.stdenv.isDarwin; # Wheels default on macOS, Source default on Linux
+            preferWheels = pkgs.stdenv.isDarwin;
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
@@ -48,17 +48,27 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Tree Sitter (Force Wheels on Linux) ---
-              # Source builds fail due to missing C headers (tree_sitter/parser.h).
-              # We force wheels and use autoPatchelfHook to link them to Nix libs.
+              # --- FIX: Tree Sitter (Robust Fix) ---
+              # 1. preferWheel: Try to use binary if lockfile allows.
+              # 2. autoPatchelf: If wheel is used, fix linux linking.
+              # 3. setuptools/wheel: If source build triggers, these are required.
+              # 4. pkgs.tree-sitter: If source build triggers, this provides parser.h.
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools 
+                  pkgs.python311Packages.wheel
+                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                buildInputs = (old.buildInputs or []) ++ [ pkgs.tree-sitter ];
               });
 
               tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
                 preferWheel = true;
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools 
+                  pkgs.python311Packages.wheel
+                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                buildInputs = (old.buildInputs or []) ++ [ pkgs.tree-sitter ];
               });
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
