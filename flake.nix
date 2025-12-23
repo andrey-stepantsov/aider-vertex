@@ -69,8 +69,8 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # CORRECT HASH for rpds-py
-                    hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
+                    # Placeholder AAAA: We need to find this hash next.
+                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                   };
                 }
               else 
@@ -87,7 +87,8 @@
 
                   src = pkgs.fetchPypi {
                     inherit pname version;
-                    hash = "sha256-o7I9QxappJ+XvM0uXEtM5O9b/iO/M06PT+QvSIj7Xns=";
+                    # CORRECT HASH (Verified from your previous log)
+                    hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
 
                   nativeBuildInputs = with pkgs; [
@@ -98,8 +99,8 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # PLACEHOLDER: CI will fail here next, giving us the REAL watchfiles hash
-                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                    # Placeholder BBBB: Distinct so we don't mix it up with rpds-py
+                    hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
               else
