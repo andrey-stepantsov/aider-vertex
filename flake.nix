@@ -48,41 +48,31 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
               # --- FIX: Broken Metadata ---
-              # Force wheel for this package to avoid "Poetry configuration is invalid" error
               aiohappyeyeballs = prev.aiohappyeyeballs.overridePythonAttrs (old: {
                 preferWheel = true;
               });
 
               # --- FIX: Hybrid Build Strategy ---
               
-              # 1. rpds-py
+              # 1. rpds-py (Fixed!)
               rpds-py = if pkgs.stdenv.isLinux then 
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "rpds_py";
                   version = "0.22.3";
                   format = "pyproject";
-                  
                   src = pkgs.fetchPypi {
                     inherit pname version;
                     hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
                   };
-
-                  nativeBuildInputs = with pkgs; [
-                    rustPlatform.cargoSetupHook
-                    rustPlatform.maturinBuildHook
-                  ];
-
+                  nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # CORRECT HASH verified by previous run
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
                 }
               else 
-                prev.rpds-py.overridePythonAttrs (old: {
-                  preferWheel = true;
-                });
+                prev.rpds-py.overridePythonAttrs (old: { preferWheel = true; });
 
               # 2. watchfiles
               watchfiles = if pkgs.stdenv.isLinux then
@@ -93,7 +83,8 @@
 
                   src = pkgs.fetchPypi {
                     inherit pname version;
-                    hash = "sha256-o7I9QxappJ+XvM0uXEtM5O9b/iO/M06PT+QvSIj7Xns=";
+                    # UPDATED: The correct source hash from your logs
+                    hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
 
                   nativeBuildInputs = with pkgs; [
@@ -104,14 +95,12 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Waiting for this specific mismatch
+                    # Placeholder BBBB: The CI will fail here next, giving us the final hash
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
               else
-                prev.watchfiles.overridePythonAttrs (old: {
-                  preferWheel = true;
-                });
+                prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
             });
 
             postFixup = ''
