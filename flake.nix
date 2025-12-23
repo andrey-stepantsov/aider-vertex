@@ -33,6 +33,8 @@
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
+            # On Mac, we generally prefer wheels. On Linux, we default to source 
+            # unless specified otherwise in overrides.
             preferWheels = pkgs.stdenv.isDarwin;
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
@@ -50,8 +52,8 @@
               # --- FIX: Hybrid Build Strategy ---
               
               # 1. rpds-py
-              # Linux: We define it MANUALLY to bypass the poetry2nix RISC-V crash.
-              # macOS: We use the default poetry2nix generation (Wheels) because it works.
+              # Linux: Manual Source Build (Bypasses the "riscv64" crash in poetry2nix evaluation)
+              # Mac: Use default poetry2nix generation (Wheels)
               rpds-py = if pkgs.stdenv.isLinux then 
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "rpds_py";
@@ -68,11 +70,10 @@
                     rustPlatform.maturinBuildHook
                   ];
 
-                  # This placeholder will cause a hash mismatch.
-                  # The CI error log will give us the REAL hash to put here.
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
+                    # PLACEHOLDER: The CI failure will tell us the real hash to put here
                     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                   };
                 }
@@ -82,12 +83,37 @@
                 });
 
               # 2. watchfiles
-              # Use wheels everywhere, but apply autoPatchelfHook on Linux so binaries run.
-              watchfiles = prev.watchfiles.overridePythonAttrs (old: {
-                preferWheel = true;
-                nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ 
-                  (if pkgs.stdenv.isLinux then [ pkgs.autoPatchelfHook ] else [ ]);
-              });
+              # Linux: Manual Source Build (Bypasses "missing version 1.1.0" error in poetry2nix)
+              # Mac: Use default poetry2nix generation (Wheels)
+              watchfiles = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "watchfiles";
+                  version = "1.1.0";
+                  format = "pyproject";
+
+                  src = pkgs.fetchPypi {
+                    inherit pname version;
+                    hash = "sha256-o7I9QxappJ+XvM0uXEtM5O9b/iO/M06PT+QvSIj7Xns=";
+                  };
+
+                  nativeBuildInputs = with pkgs; [
+                    rustPlatform.cargoSetupHook
+                    rustPlatform.maturinBuildHook
+                    # Linux needs autoPatchelfHook if we were using wheels, 
+                    # but for source build it handles linking itself.
+                  ];
+
+                  cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
+                    inherit src;
+                    name = "${pname}-${version}";
+                    # PLACEHOLDER: The CI failure will tell us the real hash to put here
+                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                  };
+                }
+              else
+                prev.watchfiles.overridePythonAttrs (old: {
+                  preferWheel = true;
+                });
             });
 
             postFixup = ''
