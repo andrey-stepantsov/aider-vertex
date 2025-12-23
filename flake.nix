@@ -107,17 +107,17 @@
                 }
               else prev.grpcio.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for hf-xet (Rust package missing maturin)
+              # Force ABI3 wheel for hf-xet (Rust package)
               hf-xet = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "hf_xet";
-                  version = "1.1.7"; # From logs
+                  version = "1.1.7";
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
-                    dist = "cp311";
-                    python = "cp311";
-                    abi = "cp311";
+                    dist = "cp37";  # Changed to cp37 (abi3)
+                    python = "cp37"; # Changed to cp37 (abi3)
+                    abi = "abi3";    # Changed to abi3
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
                     # Placeholder GGGG: CI will fail here first
                     hash = "sha256-GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG=";
