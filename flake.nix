@@ -167,6 +167,7 @@
                 }
               else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
 
+              # Force wheel for numpy + autoPatchelfHook
               numpy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "numpy";
@@ -180,10 +181,13 @@
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
                     hash = "sha256-Zm2/tuxoliwDOkUJQ97Ykb7S1U5nVeNeWDXWP09pMdU=";
                   };
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+                  buildInputs = [ pkgs.gfortran.cc.lib ];
                   passthru = { blas = pkgs.openblas; };
                 }
               else prev.numpy.overridePythonAttrs (old: { preferWheel = true; });
 
+              # Force wheel for scipy + autoPatchelfHook
               scipy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "scipy";
@@ -197,9 +201,12 @@
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
                     hash = "sha256-OcucYuRxsbs3UAZuzDo/MFKzd1HHw9/Q/X5IkA7VKYI=";
                   };
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+                  buildInputs = [ pkgs.gfortran.cc.lib ];
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
+              # Regex with source patch
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
@@ -218,13 +225,6 @@
                   nativeBuildInputs = [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
-
-              # Fix shapely source build by providing libgfortran for numpy
-              shapely = prev.shapely.overridePythonAttrs (old: {
-                preBuild = ''
-                  export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
-                '';
-              });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -259,7 +259,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The final failure!
+                    # Placeholder BBBB: The final boss!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
