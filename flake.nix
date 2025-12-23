@@ -200,11 +200,32 @@
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for regex
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
                   version = "2024.11.6";
+                  format = "pyproject";
+                  
+                  src = pkgs.fetchPypi {
+                    inherit pname version;
+                    # CORRECT HASH
+                    hash = "sha256-erFZsGPFKgMzyITkZ5+NeoURLuMHj+PZAEst2HVYVRk=";
+                  };
+
+                  postPatch = ''
+                    if [ -f pyproject.toml ]; then
+                      sed -i '/license = /d' pyproject.toml
+                      sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
+                    fi
+                  '';
+                }
+              else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Force wheel for shapely (depends on numpy/geos)
+              shapely = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "shapely";
+                  version = "2.1.2"; # Matches log
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
@@ -212,11 +233,11 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # CORRECT HASH (Verified)
-                    hash = "sha256-8qGfMCzRzl3QGpCZqqGcrmFzMG0TAqQ7Yn9i4hzxisA=";
+                    # Placeholder PPPP: CI will fail here next
+                    hash = "sha256-PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP=";
                   };
                 }
-              else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
+              else prev.shapely.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
