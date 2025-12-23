@@ -20,6 +20,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
+          # Helper to fix Google's missing license in pyproject.toml
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -33,7 +34,7 @@
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
-            preferWheels = pkgs.stdenv.isDarwin;
+            preferWheels = pkgs.stdenv.isDarwin; # Wheels default on macOS, Source default on Linux
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
@@ -47,7 +48,20 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Broken Metadata / Build Backends ---
+              # --- FIX: Tree Sitter (Force Wheels on Linux) ---
+              # Source builds fail due to missing C headers (tree_sitter/parser.h).
+              # We force wheels and use autoPatchelfHook to link them to Nix libs.
+              tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
+                preferWheel = true;
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+              });
+
+              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
+                preferWheel = true;
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+              });
+
+              # --- FIX: Linux Build Backend & Metadata Issues ---
               
               aiohappyeyeballs = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
@@ -104,6 +118,8 @@
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
                     hash = "sha256-yY4LdDSn+k4+Y/JQRW6u9SSZ+6WuZhxYzFtUd9EecYI=";
                   };
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+                  buildInputs = [ pkgs.stdenv.cc.cc.lib ];
                 }
               else prev.grpcio.overridePythonAttrs (old: { preferWheel = true; });
 
@@ -228,15 +244,6 @@
                   export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
                 '';
               });
-              
-              # FIX: Missing setuptools for tree-sitter packages
-              tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
-              });
-
-              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
-              });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -271,7 +278,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Still waiting for this!
+                    # !!! COPY THE REAL HASH FROM THE ERROR MESSAGE AND PASTE HERE !!!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
@@ -279,6 +286,11 @@
             });
 
             postFixup = ''
+              # Ensure the binary is renamed BEFORE wrapping
+              if [ -f $out/bin/aider ]; then
+                mv $out/bin/aider $out/bin/aider-vertex
+              fi
+
               wrapProgram $out/bin/aider-vertex \
                 --set PYTHONUTF8 1 \
                 --set LC_ALL C.UTF-8 \
