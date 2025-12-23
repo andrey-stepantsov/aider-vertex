@@ -8,6 +8,7 @@ on:
 jobs:
   check-build:
     strategy:
+      fail-fast: false
       matrix:
         # Verify both Linux (CentOS/Ubuntu proxy) and Intel macOS
         os: [ubuntu-latest, macos-latest] 
