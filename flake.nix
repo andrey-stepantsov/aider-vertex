@@ -200,29 +200,23 @@
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # FIX: Regex with source patch
+              # Force wheel for regex to bypass missing setuptools/build issues
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
-                  version = "2024.11.6"; 
-                  format = "pyproject";
-                  
+                  version = "2024.11.6";
+                  format = "wheel";
                   src = pkgs.fetchPypi {
-                    inherit pname version;
-                    # CORRECT HASH
-                    hash = "sha256-erFZsGPFKgMzyITkZ5+NeoURLuMHj+PZAEst2HVYVRk=";
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # Placeholder MMMM: CI will fail here next
+                    hash = "sha256-MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM=";
                   };
-
-                  # Patch out the bad license config
-                  postPatch = ''
-                    if [ -f pyproject.toml ]; then
-                      sed -i '/license = /d' pyproject.toml
-                      sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
-                    fi
-                  '';
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
-
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -257,7 +251,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The final failure!
+                    # Placeholder BBBB: The final boss!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
