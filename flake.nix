@@ -118,11 +118,28 @@
                     python = "cp37";
                     abi = "abi3";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # CORRECT HASH verified from logs
                     hash = "sha256-bvqvGlqfw6UB0+ceiKa/68ae46cW0OcTqTHIuNkgA48=";
                   };
                 }
               else prev.hf-xet.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Force wheel for jiter (Rust package missing maturin)
+              jiter = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "jiter";
+                  version = "0.10.0"; # From logs
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # Placeholder HHHH: CI will fail here first
+                    hash = "sha256-HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH=";
+                  };
+                }
+              else prev.jiter.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -157,7 +174,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The final failure!
+                    # Placeholder BBBB: Still waiting for this!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
