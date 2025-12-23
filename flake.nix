@@ -200,7 +200,7 @@
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for regex to bypass missing setuptools/build issues
+              # Force wheel for regex
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
@@ -212,8 +212,8 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder MMMM: CI will fail here next
-                    hash = "sha256-MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM=";
+                    # CORRECT HASH (Verified)
+                    hash = "sha256-8qGfMCzRzl3QGpCZqqGcrmFzMG0TAqQ7Yn9i4hzxisA=";
                   };
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
@@ -251,7 +251,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The final boss!
+                    # Placeholder BBBB: The final failure!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
