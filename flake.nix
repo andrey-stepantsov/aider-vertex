@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.0.0)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -11,7 +11,7 @@
 
   outputs = { self, nixpkgs, poetry2nix }:
     let
-      # 1. Define supported architectures
+      # 1. Define supported architectures for multi-platform claims
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       
       # 2. Helper to generate outputs for each system
@@ -22,7 +22,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
           
-          # The Google Metadata Fix we perfected earlier
+          # The Google Metadata Fix to handle the Apache-2.0 license naming bug
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -37,6 +37,9 @@
             python = pkgs.python311;
             preferWheels = true;
 
+            # 3. Add makeWrapper to nativeBuildInputs for the postFixup phase
+            nativeBuildInputs = [ pkgs.makeWrapper ];
+
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
               # Google SDK Overrides
               google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
@@ -48,7 +51,7 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # Rust-based dependency fixes
+              # Rust-based dependency fixes for cross-platform stability
               rpds-py = prev.rpds-py.overridePythonAttrs (old: {
                 preferWheel = false; 
                 src = pkgs.fetchPypi {
@@ -65,7 +68,22 @@
 
               watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
             });
+
+            # 4. Wrap the binary to force UTF-8 support for older Linux terminals (CentOS 7)
+            postFixup = ''
+              wrapProgram $out/bin/aider-vertex \
+                --set PYTHONUTF8 1 \
+                --set LC_ALL C.UTF-8 \
+                --set LANG C.UTF-8
+            '';
           };
         });
+
+      # Optional: Add a development shell for testing
+      devShells = forAllSystems (system: {
+        default = nixpkgs.legacyPackages.${system}.mkShell {
+          packages = [ self.packages.${system}.default ];
+        };
+      });
     };
 }
