@@ -167,7 +167,6 @@
                 }
               else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for numpy & mock BLAS attribute
               numpy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "numpy";
@@ -179,14 +178,12 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # CORRECT HASH (Verified)
                     hash = "sha256-Zm2/tuxoliwDOkUJQ97Ykb7S1U5nVeNeWDXWP09pMdU=";
                   };
                   passthru = { blas = pkgs.openblas; };
                 }
               else prev.numpy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for scipy (depends on numpy)
               scipy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "scipy";
@@ -198,8 +195,8 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder LLLL: CI will fail here next
-                    hash = "sha256-LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL=";
+                    # CORRECT HASH (Verified)
+                    hash = "sha256-OcucYuRxsbs3UAZuzDo/MFKzd1HHw9/Q/X5IkA7VKYI=";
                   };
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
@@ -237,7 +234,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Still waiting for this!
+                    # Placeholder BBBB: The final failure!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
