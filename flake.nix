@@ -77,21 +77,38 @@
                 }
               else prev.click.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for docstring-parser to avoid "No module named hatchling"
               docstring-parser = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "docstring_parser";
-                  version = "0.17.0"; # Version from your logs
+                  version = "0.17.0";
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # Placeholder EEEE: CI will fail here first
-                    hash = "sha256-EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=";
+                    # CORRECT HASH
+                    hash = "sha256-zyVpq9I9zoCZswD5tPqBkelYLdpzH9Uz2vVMRVFlhwg=";
                   };
                 }
               else prev.docstring-parser.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Pre-emptive fix for grpcio to avoid compilation issues
+              grpcio = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "grpcio";
+                  version = "1.74.0"; # Matches log version
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # Placeholder FFFF: This will be the next failure
+                    hash = "sha256-FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF=";
+                  };
+                }
+              else prev.grpcio.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
