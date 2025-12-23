@@ -220,12 +220,24 @@
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Corrected Shapely: Source build + libgfortran injection
-              shapely = prev.shapely.overridePythonAttrs (old: {
-                preBuild = ''
-                  export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
-                '';
-              });
+              # Force wheel for shapely
+              shapely = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "shapely";
+                  version = "2.1.2"; 
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # Placeholder PPPP: Retry wheel fetch
+                    hash = "sha256-PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP=";
+                  };
+                }
+              else prev.shapely.overridePythonAttrs (old: { preferWheel = true; });
+
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
