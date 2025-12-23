@@ -66,11 +66,11 @@
                     rustPlatform.maturinBuildHook
                   ];
 
-                  # Still waiting for this specific hash, leaving placeholder
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                    # CORRECT HASH (Found in previous failure logs)
+                    hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
                 }
               else 
@@ -79,7 +79,6 @@
                 });
 
               # 2. watchfiles
-              # Applied the hash you just found: sha256-aT7X7H...
               watchfiles = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "watchfiles";
@@ -99,8 +98,8 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # UPDATED HASH FROM YOUR LOGS
-                    hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
+                    # PLACEHOLDER: We need to trigger one more failure to get this hash
+                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                   };
                 }
               else
