@@ -54,25 +54,34 @@
 
               # --- FIX: Hybrid Build Strategy ---
               
-              # 1. rpds-py (Fixed!)
+              # 1. rpds-py
               rpds-py = if pkgs.stdenv.isLinux then 
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "rpds_py";
                   version = "0.22.3";
                   format = "pyproject";
+                  
                   src = pkgs.fetchPypi {
                     inherit pname version;
                     hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
                   };
-                  nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
+
+                  nativeBuildInputs = with pkgs; [
+                    rustPlatform.cargoSetupHook
+                    rustPlatform.maturinBuildHook
+                  ];
+
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
+                    # CORRECT HASH (Extracted from your logs)
+                    hash = "sha256-zpmgLLsNA3OzuaSBWoAZuA5nMg9mXWbY5qILE+7hucs=";
                   };
                 }
               else 
-                prev.rpds-py.overridePythonAttrs (old: { preferWheel = true; });
+                prev.rpds-py.overridePythonAttrs (old: {
+                  preferWheel = true;
+                });
 
               # 2. watchfiles
               watchfiles = if pkgs.stdenv.isLinux then
@@ -83,7 +92,7 @@
 
                   src = pkgs.fetchPypi {
                     inherit pname version;
-                    # UPDATED: The correct source hash from your logs
+                    # Correct Source Hash
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
 
@@ -95,12 +104,14 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The CI will fail here next, giving us the final hash
+                    # Placeholder BBBB: The CI will fail here NEXT.
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
               else
-                prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
+                prev.watchfiles.overridePythonAttrs (old: {
+                  preferWheel = true;
+                });
             });
 
             postFixup = ''
