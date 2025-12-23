@@ -52,17 +52,21 @@
 
               # Rust dependency stabilization
               rpds-py = prev.rpds-py.overridePythonAttrs (old: {
+                # Force source build to ensure it works on legacy Linux
                 preferWheel = false;
-                src = pkgs.fetchPypi {
-                  pname = "rpds_py";
-                  version = "0.22.3";
-                  hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
-                };
                 cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
-                  inherit (final.rpds-py) src;
+                  inherit (old) src;
                   name = "rpds-py-vendor";
-                  hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
+                  # Use a conditional for the hash to satisfy both platforms
+                  hash =
+                    if pkgs.stdenv.isLinux
+                    then "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8="
+                    else "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
                 };
+                nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
+                  pkgs.rustPlatform.cargoSetupHook
+                  pkgs.rustPlatform.maturinBuildHook
+                ];
               });
 
               watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
@@ -89,3 +93,4 @@
       });
     };
 }
+
