@@ -48,7 +48,6 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
               # --- FIX: Broken Metadata ---
-              # Force manual wheel download for aiohappyeyeballs to bypass build error
               aiohappyeyeballs = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "aiohappyeyeballs";
@@ -58,12 +57,12 @@
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # Placeholder CCCC: The CI will fail here first
-                    hash = "sha256-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=";
+                    # CORRECT HASH (Verified from logs)
+                    hash = "sha256-80m6j0t1yyXJnFwthOmX5IUgTSkCqVl4ArA3HwkzH7g=";
                   };
                 }
               else
-                prev.aiohappyeyeballs;
+                prev.aiohappyeyeballs.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy ---
               
@@ -93,15 +92,21 @@
                   pname = "watchfiles";
                   version = "1.1.0";
                   format = "pyproject";
+
                   src = pkgs.fetchPypi {
                     inherit pname version;
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
-                  nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
+
+                  nativeBuildInputs = with pkgs; [
+                    rustPlatform.cargoSetupHook
+                    rustPlatform.maturinBuildHook
+                  ];
+
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Still waiting for this one!
+                    # Placeholder BBBB: The build will fail here next!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
