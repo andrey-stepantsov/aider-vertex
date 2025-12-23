@@ -149,8 +149,8 @@
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # Placeholder IIII: CI will fail here first
-                    hash = "sha256-IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII=";
+                    # CORRECT HASH verified from logs
+                    hash = "sha256-xwdLNHIBs0ZvwHfFaS+86bX2KmOlH1N6U/u9Au/y7qQ=";
                   };
                 }
               else prev.mslex.overridePythonAttrs (old: { preferWheel = true; });
@@ -188,7 +188,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Still waiting for this!
+                    # Placeholder BBBB: The build WILL fail here next!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
