@@ -167,7 +167,7 @@
                 }
               else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for numpy + autoPatchelfHook
+              # Force wheel for numpy + autoPatchelfHook + libs
               numpy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "numpy";
@@ -182,12 +182,12 @@
                     hash = "sha256-Zm2/tuxoliwDOkUJQ97Ykb7S1U5nVeNeWDXWP09pMdU=";
                   };
                   nativeBuildInputs = [ pkgs.autoPatchelfHook ];
-                  buildInputs = [ pkgs.gfortran.cc.lib ];
+                  buildInputs = [ pkgs.gfortran.cc.lib pkgs.zlib ];
                   passthru = { blas = pkgs.openblas; };
                 }
               else prev.numpy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for scipy + autoPatchelfHook
+              # Force wheel for scipy + autoPatchelfHook + libs
               scipy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "scipy";
@@ -202,7 +202,7 @@
                     hash = "sha256-OcucYuRxsbs3UAZuzDo/MFKzd1HHw9/Q/X5IkA7VKYI=";
                   };
                   nativeBuildInputs = [ pkgs.autoPatchelfHook ];
-                  buildInputs = [ pkgs.gfortran.cc.lib ];
+                  buildInputs = [ pkgs.gfortran.cc.lib pkgs.zlib ];
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
@@ -225,6 +225,13 @@
                   nativeBuildInputs = [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Shapely needs libgfortran during build (imported via numpy)
+              shapely = prev.shapely.overridePythonAttrs (old: {
+                preBuild = ''
+                  export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
+                '';
+              });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -259,7 +266,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The final boss!
+                    # Placeholder BBBB: The final failure!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
