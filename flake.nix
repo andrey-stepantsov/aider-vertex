@@ -39,7 +39,10 @@
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
-            preferWheels = true;
+
+            # THE FIX: Bypass the buggy Linux wheel parser by building from source on Linux.
+            # Fast wheels will still be used on your macOS.
+            preferWheels = pkgs.stdenv.isDarwin;
 
             # 3. Add makeWrapper to nativeBuildInputs for the postFixup phase
             nativeBuildInputs = [ pkgs.makeWrapper ];
