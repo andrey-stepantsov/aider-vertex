@@ -222,9 +222,19 @@
                   nativeBuildInputs = [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
+
+              shapely = prev.shapely.overridePythonAttrs (old: {
+                preBuild = ''
+                  export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
+                '';
+              });
               
-              # FIX: Missing setuptools for tree-sitter-c-sharp
+              # FIX: Missing setuptools for tree-sitter packages
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
+              });
+
+              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
               });
 
