@@ -33,7 +33,8 @@
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
-            # We prefer wheels on Darwin generally, but we'll enforce specific ones below
+            # On Mac, we generally prefer wheels. On Linux, we default to source 
+            # unless specified otherwise in overrides.
             preferWheels = pkgs.stdenv.isDarwin;
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
@@ -48,13 +49,40 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # Rust-based packages: Use pre-built wheels to avoid compilation hell
-              rpds-py = prev.rpds-py.overridePythonAttrs (old: { 
-                preferWheel = true; 
-              });
+              # --- HYBRID BUILD STRATEGY ---
               
-              watchfiles = prev.watchfiles.overridePythonAttrs (old: { 
-                preferWheel = true; 
+              # 1. rpds-py
+              # Mac: Use Wheel (Fast, works perfectly)
+              # Linux: Build from source (Bypasses the "riscv64" crash in poetry2nix)
+              rpds-py = prev.rpds-py.overridePythonAttrs (old: {
+                preferWheel = pkgs.stdenv.isDarwin;
+
+                # LINUX ONLY: Manually unpack source to fix the "Missing Cargo.lock" error
+                prePatch = if pkgs.stdenv.isLinux then ''
+                  tar -xf $src --strip-components=1
+                '' else "";
+
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
+                  (if pkgs.stdenv.isLinux then [ 
+                    pkgs.rustPlatform.cargoSetupHook 
+                    pkgs.rustPlatform.maturinBuildHook 
+                  ] else []);
+
+                # LINUX ONLY: Define Rust dependencies
+                # This hash is a placeholder. CI will fail and tell us the real one.
+                cargoDeps = if pkgs.stdenv.isLinux then pkgs.rustPlatform.fetchCargoTarball {
+                  inherit (final.rpds-py) src;
+                  name = "rpds-py-vendor";
+                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                } else null;
+              });
+
+              # 2. watchfiles
+              # Use wheels everywhere, but patch them on Linux so they run
+              watchfiles = prev.watchfiles.overridePythonAttrs (old: {
+                preferWheel = true;
+                nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ 
+                  (if pkgs.stdenv.isLinux then [ pkgs.autoPatchelfHook ] else [ ]);
               });
             });
 
