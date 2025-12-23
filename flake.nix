@@ -47,6 +47,12 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
+              # --- FIX: Broken Metadata ---
+              # Force wheel for this package to avoid "Poetry configuration is invalid" error
+              aiohappyeyeballs = prev.aiohappyeyeballs.overridePythonAttrs (old: {
+                preferWheel = true;
+              });
+
               # --- FIX: Hybrid Build Strategy ---
               
               # 1. rpds-py
@@ -69,8 +75,8 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder AAAA: We need to find this hash next.
-                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                    # CORRECT HASH verified by previous run
+                    hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
                 }
               else 
@@ -87,8 +93,7 @@
 
                   src = pkgs.fetchPypi {
                     inherit pname version;
-                    # CORRECT HASH (Verified from your previous log)
-                    hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
+                    hash = "sha256-o7I9QxappJ+XvM0uXEtM5O9b/iO/M06PT+QvSIj7Xns=";
                   };
 
                   nativeBuildInputs = with pkgs; [
@@ -99,7 +104,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Distinct so we don't mix it up with rpds-py
+                    # Placeholder BBBB: Waiting for this specific mismatch
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
