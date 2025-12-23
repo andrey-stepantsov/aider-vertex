@@ -47,7 +47,8 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Broken Metadata ---
+              # --- FIX: Broken Metadata / Build Issues ---
+              
               aiohappyeyeballs = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "aiohappyeyeballs";
@@ -63,26 +64,24 @@
               else
                 prev.aiohappyeyeballs.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for click to avoid flit_core metadata errors
               click = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "click";
-                  version = "8.2.1"; # Verify version matches your lockfile
+                  version = "8.2.1";
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # Placeholder DDDD: CI will fail here first
-                    hash = "sha256-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=";
+                    # CORRECT HASH verified from logs
+                    hash = "sha256-YaMmW5FOhQuFMX0LMQnH+M01pnD5Y4ZgBdbvHVF1oSs=";
                   };
                 }
               else
                 prev.click.overridePythonAttrs (old: { preferWheel = true; });
 
-              # --- FIX: Hybrid Build Strategy ---
+              # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
-              # 1. rpds-py
               rpds-py = if pkgs.stdenv.isLinux then 
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "rpds_py";
@@ -102,7 +101,6 @@
               else 
                 prev.rpds-py.overridePythonAttrs (old: { preferWheel = true; });
 
-              # 2. watchfiles
               watchfiles = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "watchfiles";
