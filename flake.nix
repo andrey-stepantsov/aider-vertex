@@ -200,7 +200,6 @@
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Corrected Regex: Source build + patch + build inputs
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
@@ -220,24 +219,12 @@
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for shapely
-              shapely = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "shapely";
-                  version = "2.1.2"; 
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "cp311";
-                    python = "cp311";
-                    abi = "cp311";
-                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder PPPP: Retry wheel fetch
-                    hash = "sha256-PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP=";
-                  };
-                }
-              else prev.shapely.overridePythonAttrs (old: { preferWheel = true; });
-
+              # Fix shapely source build by providing libgfortran for numpy
+              shapely = prev.shapely.overridePythonAttrs (old: {
+                preBuild = ''
+                  export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
+                '';
+              });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
