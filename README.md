@@ -55,18 +55,19 @@ Or, you could bring pre-made credentials and set the environment with:
 ---
 
 ## Maintenance (For the Maintainer)
-
 To update the underlying Aider engine or add new dependencies:
 
-1. Update version in `pyproject.toml`.
-2. Refresh the lockfile:
+1. **Update Versions**: 
+   - Update `version` in `pyproject.toml`.
+   - Update `WRAPPER_VERSION` in `aider_vertex/main.py` to match.
+2. **Refresh the Lockfile**:
     nix shell nixpkgs#poetry nixpkgs#python311 -c poetry update aider-chat
-3. Rebuild and Verify:
+3. **Rebuild and Verify**:
     git add .
     nix build . -L
     ./result/bin/aider-vertex --version
-4. Release:
-    git tag v0.86.x
+4. **Release**:
+    git tag -a v1.0.x -m "Release v1.0.x: Wrapping Aider v0.86.1"
     git push origin main --follow-tags
 
 ---
