@@ -33,13 +33,11 @@
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
-            # On Mac, we generally prefer wheels. On Linux, we default to source 
-            # unless specified otherwise in overrides.
             preferWheels = pkgs.stdenv.isDarwin;
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
-              # Google Cloud Fixes
+              # --- Google Cloud Fixes ---
               google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
               google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
               google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -49,36 +47,42 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- HYBRID BUILD STRATEGY ---
+              # --- FIX: Hybrid Build Strategy ---
               
               # 1. rpds-py
-              # Mac: Use Wheel (Fast, works perfectly)
-              # Linux: Build from source (Bypasses the "riscv64" crash in poetry2nix)
-              rpds-py = prev.rpds-py.overridePythonAttrs (old: {
-                preferWheel = pkgs.stdenv.isDarwin;
+              # Linux: We define it MANUALLY to bypass the poetry2nix RISC-V crash.
+              # macOS: We use the default poetry2nix generation (Wheels) because it works.
+              rpds-py = if pkgs.stdenv.isLinux then 
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "rpds_py";
+                  version = "0.22.3";
+                  format = "pyproject";
+                  
+                  src = pkgs.fetchPypi {
+                    inherit pname version;
+                    hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
+                  };
 
-                # LINUX ONLY: Manually unpack source to fix the "Missing Cargo.lock" error
-                prePatch = if pkgs.stdenv.isLinux then ''
-                  tar -xf $src --strip-components=1
-                '' else "";
+                  nativeBuildInputs = with pkgs; [
+                    rustPlatform.cargoSetupHook
+                    rustPlatform.maturinBuildHook
+                  ];
 
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
-                  (if pkgs.stdenv.isLinux then [ 
-                    pkgs.rustPlatform.cargoSetupHook 
-                    pkgs.rustPlatform.maturinBuildHook 
-                  ] else []);
-
-                # LINUX ONLY: Define Rust dependencies
-                # This hash is a placeholder. CI will fail and tell us the real one.
-                cargoDeps = if pkgs.stdenv.isLinux then pkgs.rustPlatform.fetchCargoTarball {
-                  inherit (final.rpds-py) src;
-                  name = "rpds-py-vendor";
-                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-                } else null;
-              });
+                  # This placeholder will cause a hash mismatch.
+                  # The CI error log will give us the REAL hash to put here.
+                  cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
+                    inherit src;
+                    name = "${pname}-${version}";
+                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                  };
+                }
+              else 
+                prev.rpds-py.overridePythonAttrs (old: {
+                  preferWheel = true;
+                });
 
               # 2. watchfiles
-              # Use wheels everywhere, but patch them on Linux so they run
+              # Use wheels everywhere, but apply autoPatchelfHook on Linux so binaries run.
               watchfiles = prev.watchfiles.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ 
