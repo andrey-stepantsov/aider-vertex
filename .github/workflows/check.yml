@@ -18,7 +18,8 @@ jobs:
       - uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          nix_path: nixpkgs=channel:nixos-24.11
+          # This ensures it doesn't fail if Nix is already there
+          install_url: https://releases.nixos.org/nix/nix-2.24.9/install
       - name: Build Aider-Vertex
         run: nix build . -L
       - name: Verify Logic (Version Check)
