@@ -153,7 +153,6 @@
                 }
               else prev.mslex.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for oslex (missing hatchling)
               oslex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "oslex";
@@ -168,6 +167,25 @@
                   };
                 }
               else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Force wheel for numpy to avoid build errors
+              numpy = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "numpy";
+                  version = "1.26.4";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # Placeholder KKKK: CI will fail here next
+                    hash = "sha256-KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK=";
+                  };
+                }
+              else prev.numpy.overridePythonAttrs (old: { preferWheel = true; });
+
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -202,7 +220,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The build WILL fail here next (unless pydantic-core beats it to it)
+                    # Placeholder BBBB: Still waiting for this!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
