@@ -200,7 +200,7 @@
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Corrected Regex: Build from source with patch (Wheel 404'd)
+              # Corrected Regex: Source build + patch + build inputs
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
@@ -208,7 +208,6 @@
                   format = "pyproject";
                   src = pkgs.fetchPypi {
                     inherit pname version;
-                    # Correct Source Hash
                     hash = "sha256-erFZsGPFKgMzyITkZ5+NeoURLuMHj+PZAEst2HVYVRk=";
                   };
                   postPatch = ''
@@ -217,6 +216,7 @@
                       sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
                     fi
                   '';
+                  nativeBuildInputs = [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
 
@@ -260,7 +260,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The final boss!
+                    # Placeholder BBBB: The final failure!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
