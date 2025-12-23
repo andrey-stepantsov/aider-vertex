@@ -13,15 +13,16 @@
     let
       # 1. Define supported architectures for multi-platform claims
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
-      
+
       # 2. Helper to generate outputs for each system
       forAllSystems = nixpkgs.lib.genAttrs systems;
-    in {
+    in
+    {
       packages = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
-          
+
           # The Google Metadata Fix to handle the Apache-2.0 license naming bug
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
@@ -31,7 +32,8 @@
               fi
             '';
           };
-        in {
+        in
+        {
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
@@ -53,7 +55,7 @@
 
               # Rust-based dependency fixes for cross-platform stability
               rpds-py = prev.rpds-py.overridePythonAttrs (old: {
-                preferWheel = false; 
+                preferWheel = false;
                 src = pkgs.fetchPypi {
                   pname = "rpds_py";
                   version = "0.22.3";
@@ -82,8 +84,26 @@
       # Optional: Add a development shell for testing
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
-          packages = [ self.packages.${system}.default ];
+          # This pulls in everything you need to develop, test, and debug
+          packages = [
+            # 1. Your actual package (so you can run 'aider-vertex' inside the shell)
+            self.packages.${system}.default
+
+            # 2. Essential maintainer tools
+            nixpkgs.legacyPackages.${system}.gh # GitHub CLI for checking CI logs
+            nixpkgs.legacyPackages.${system}.git # Git for version control
+            nixpkgs.legacyPackages.${system}.poetry # In case you need to update poetry.lock
+          ];
+
+          # Optional: A nice welcome message when you enter the shell
+          shellHook = ''
+            echo "--- Aider-Vertex Dev Environment ---"
+            echo "Aider: $(aider-vertex --version)"
+            echo "GitHub CLI: $(gh --version | head -n 1)"
+            echo "------------------------------------"
+          '';
         };
       });
     };
 }
+
