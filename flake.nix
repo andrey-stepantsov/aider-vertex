@@ -123,11 +123,10 @@
                 }
               else prev.hf-xet.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for jiter (Rust package missing maturin)
               jiter = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "jiter";
-                  version = "0.10.0"; # From logs
+                  version = "0.10.0";
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
@@ -135,8 +134,8 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder HHHH: CI will fail here first
-                    hash = "sha256-HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH=";
+                    # CORRECT HASH verified from logs
+                    hash = "sha256-TEQOoAOtEJJ6MFIakGLOELVHlZLopw2ifyHutFe0qcU=";
                   };
                 }
               else prev.jiter.overridePythonAttrs (old: { preferWheel = true; });
@@ -174,7 +173,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Still waiting for this!
+                    # Placeholder BBBB: The build WILL fail here next (unless pydantic-core beats it to it)
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
