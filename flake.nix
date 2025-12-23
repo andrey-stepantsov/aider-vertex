@@ -20,7 +20,6 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
-          # Helper to fix Google's missing license in pyproject.toml
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -48,40 +47,45 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Tree Sitter (Robust Fix) ---
-              # Source builds require:
-              # 1. setuptools/wheel (build backend)
-              # 2. pkgs.tree-sitter (C headers)
-              # 3. Explicit CFLAGS to find those headers
-              tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
-                preferWheel = true;
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
-                  pkgs.python311Packages.setuptools 
-                  pkgs.python311Packages.wheel
-                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                
-                buildInputs = (old.buildInputs or []) ++ [ pkgs.tree-sitter ];
-                
-                # FORCE the compiler to find tree_sitter/parser.h
-                preBuild = (old.preBuild or "") + ''
-                  export CFLAGS="-I${pkgs.tree-sitter}/include $CFLAGS"
-                '';
-              });
+              # --- FIX: Tree Sitter (Force Manual Wheels on Linux) ---
+              # poetry2nix refuses to use wheels if they aren't in the lockfile.
+              # We manually define the derivation to bypass source compilation entirely.
+              
+              tree-sitter-c-sharp = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "tree_sitter_c_sharp"; # Underscores for wheel filename
+                  version = "0.23.1";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # !!! PLACEHOLDER 1: Run build, get hash, replace here.
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
+                }
+              else prev.tree-sitter-c-sharp;
 
-              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
-                preferWheel = true;
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
-                  pkgs.python311Packages.setuptools 
-                  pkgs.python311Packages.wheel
-                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                
-                buildInputs = (old.buildInputs or []) ++ [ pkgs.tree-sitter ];
-                
-                # FORCE the compiler to find tree_sitter/parser.h
-                preBuild = (old.preBuild or "") + ''
-                  export CFLAGS="-I${pkgs.tree-sitter}/include $CFLAGS"
-                '';
-              });
+              tree-sitter-embedded-template = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "tree_sitter_embedded_template"; # Underscores for wheel filename
+                  version = "0.23.2";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    # !!! PLACEHOLDER 2: Run build, get hash, replace here.
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
+                }
+              else prev.tree-sitter-embedded-template;
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
               
@@ -300,7 +304,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! COPY THE REAL HASH FROM THE ERROR MESSAGE AND PASTE HERE !!!
+                    # !!! PLACEHOLDER 3: Run build, get hash, replace here.
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
