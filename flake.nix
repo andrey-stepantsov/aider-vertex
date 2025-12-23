@@ -204,13 +204,13 @@
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
-                  version = "2024.11.6"; # Using the standard latest version to verify
+                  version = "2024.11.6"; 
                   format = "pyproject";
                   
                   src = pkgs.fetchPypi {
                     inherit pname version;
-                    # Placeholder NNNN: We need to find this hash
-                    hash = "sha256-NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN=";
+                    # CORRECT HASH
+                    hash = "sha256-erFZsGPFKgMzyITkZ5+NeoURLuMHj+PZAEst2HVYVRk=";
                   };
 
                   # Patch out the bad license config
@@ -257,7 +257,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Still waiting for this!
+                    # Placeholder BBBB: The final failure!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
