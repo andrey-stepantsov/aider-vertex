@@ -139,7 +139,6 @@
                 }
               else prev.jiter.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for mslex (missing setuptools)
               mslex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "mslex";
@@ -149,11 +148,26 @@
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # CORRECT HASH verified from logs
                     hash = "sha256-xwdLNHIBs0ZvwHfFaS+86bX2KmOlH1N6U/u9Au/y7qQ=";
                   };
                 }
               else prev.mslex.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Force wheel for oslex (missing hatchling)
+              oslex = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "oslex";
+                  version = "0.1.3"; # Verified from logs
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "py3";
+                    python = "py3";
+                    # Placeholder JJJJ: CI will fail here first
+                    hash = "sha256-JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ=";
+                  };
+                }
+              else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -188,7 +202,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: The build WILL fail here next!
+                    # Placeholder BBBB: Still waiting for this!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
