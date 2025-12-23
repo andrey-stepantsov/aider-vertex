@@ -20,6 +20,12 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
+          # Fetch Tree-Sitter 0.23.0 Source for Headers (Fixes parser.h error)
+          treeSitter023 = pkgs.fetchzip {
+            url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
+            hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
+          };
+
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -47,43 +53,34 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Tree Sitter (Force Manual ABI3 Wheels) ---
+              # --- FIX: Tree Sitter (Header Compatibility) ---
+              # We provide tree-sitter 0.23.0 headers explicitly via CFLAGS
               
-              tree-sitter-c-sharp = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "tree_sitter_c_sharp"; 
-                  version = "0.23.1";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "cp39";      # Changed from cp311
-                    python = "cp39";    # Changed from cp311
-                    abi = "abi3";       # Changed from cp311 to abi3
-                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # !!! PLACEHOLDER 1: Run build, get hash, replace here.
-                    hash = "sha256-0000000000000000000000000000000000000000000=";
-                  };
-                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
-                }
-              else prev.tree-sitter-c-sharp;
+              tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
+                preferWheel = true; # Try wheel first
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools 
+                  pkgs.python311Packages.wheel
+                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                
+                # Point compiler to the manually fetched 0.23.0 headers
+                preBuild = (old.preBuild or "") + ''
+                  export CFLAGS="-I${treeSitter023}/lib/include -I${treeSitter023}/lib/src $CFLAGS"
+                '';
+              });
 
-              tree-sitter-embedded-template = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "tree_sitter_embedded_template"; 
-                  version = "0.23.2";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "cp39";      # Changed from cp311
-                    python = "cp39";    # Changed from cp311
-                    abi = "abi3";       # Changed from cp311 to abi3
-                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # !!! PLACEHOLDER 2: Run build, get hash, replace here.
-                    hash = "sha256-0000000000000000000000000000000000000000000=";
-                  };
-                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
-                }
-              else prev.tree-sitter-embedded-template;
+              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
+                preferWheel = true;
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools 
+                  pkgs.python311Packages.wheel
+                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                
+                # Point compiler to the manually fetched 0.23.0 headers
+                preBuild = (old.preBuild or "") + ''
+                  export CFLAGS="-I${treeSitter023}/lib/include -I${treeSitter023}/lib/src $CFLAGS"
+                '';
+              });
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
               
@@ -302,7 +299,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! PLACEHOLDER 3: Run build, get hash, replace here.
+                    # !!! PLACEHOLDER 2: Run build, copy 'got: sha256-...' hash, and paste here.
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
