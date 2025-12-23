@@ -6,6 +6,7 @@ This package bridges the gap between Aider's rapid development cycle and the spe
 
 ## Features
 - **Nix Powered**: Fully reproducible build environment for Intel/Silicon Macs and Linux.
+  - Multi-platform: Verified on macOS (Apple Silicon). Support for Linux and Intel Macs is included in the configuration but is currently experimental/untested.
 - **Vertex Ready**: Includes patched dependencies for `google-cloud-aiplatform`, `watchfiles`, and `rpds-py`.
 - **Cutting Edge**: Currently tracks **Aider v0.86.1** with Tree-sitter and Architect mode support.
 - **Transparent**: Passes all CLI arguments directly to the underlying Aider engine.
@@ -29,20 +30,24 @@ Before running, ensure you have authenticated with Google Cloud and set your pro
 ### 1. Authenticate
     gcloud auth login
     gcloud auth application-default login
+    
+Or, you could bring pre-made credentials and set the environment with:
+    
+    export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"  
 
 ### 2. Set Environment Variables
-    export VERTEX_PROJECT="your-project-id"
-    export VERTEX_LOCATION="us-central1"
+    export VERTEXAI_PROJECT="your-project-id"
+    export VERTEXAI_LOCATION="us-central1"
 
 *Note: Model availability depends on your `VERTEX_LOCATION`. Check the Vertex AI Console to confirm which models are enabled for your project.*
 
 ## Usage Examples
 
-**Chat with Gemini 1.5 Pro:**
-    aider-vertex --model vertex_ai/gemini-1.5-pro-002
+**Chat with Gemini 2.5 Pro:**
+    aider-vertex --model vertex_ai/gemini-2.5-flash
 
-**Architect Mode with Gemini 2.0 (Experimental):**
-    aider-vertex --architect --model vertex_ai/gemini-2.0-flash-exp
+**Architect Mode with Gemini 3 Preview:**
+    aider-vertex --architect --model vertex_ai/gemini-3-pro-preview
 
 **Check Version:**
     aider-vertex --version
