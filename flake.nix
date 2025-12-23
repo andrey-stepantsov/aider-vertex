@@ -157,14 +157,14 @@
               oslex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "oslex";
-                  version = "0.1.3"; # Verified from logs
+                  version = "0.1.3";
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # Placeholder JJJJ: CI will fail here first
-                    hash = "sha256-JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ=";
+                    # CORRECT HASH verified from logs
+                    hash = "sha256-cay4odQu143dITodOmKLv4N/dYvSmZyR33zleXJGa98=";
                   };
                 }
               else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
@@ -202,7 +202,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # Placeholder BBBB: Still waiting for this!
+                    # Placeholder BBBB: The build WILL fail here next (unless pydantic-core beats it to it)
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
