@@ -18,6 +18,7 @@ jobs:
       - uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          nix_path: nixpkgs=channel:nixos-24.11
       - name: Build Aider-Vertex
         run: nix build . -L
       - name: Verify Logic (Version Check)
