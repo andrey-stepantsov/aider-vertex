@@ -14,9 +14,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v25
+      - uses: cachix/install-nix-action@v30
         with:
-          # Faster builds using the public Nix cache
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Aider-Vertex
         run: nix build . -L
