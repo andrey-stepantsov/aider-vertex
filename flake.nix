@@ -195,29 +195,34 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # CORRECT HASH (Verified)
                     hash = "sha256-OcucYuRxsbs3UAZuzDo/MFKzd1HHw9/Q/X5IkA7VKYI=";
                   };
                 }
               else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
 
-              # Force wheel for regex (metadata issue)
+              # FIX: Regex with source patch
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "regex";
-                  version = "2025.7.34"; # Matches log
-                  format = "wheel";
+                  version = "2024.11.6"; # Using the standard latest version to verify
+                  format = "pyproject";
+                  
                   src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "cp311";
-                    python = "cp311";
-                    abi = "cp311";
-                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Placeholder MMMM: CI will fail here next
-                    hash = "sha256-MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM=";
+                    inherit pname version;
+                    # Placeholder NNNN: We need to find this hash
+                    hash = "sha256-NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN=";
                   };
+
+                  # Patch out the bad license config
+                  postPatch = ''
+                    if [ -f pyproject.toml ]; then
+                      sed -i '/license = /d' pyproject.toml
+                      sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
+                    fi
+                  '';
                 }
               else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
+
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
