@@ -47,7 +47,7 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Broken Metadata / Build Issues ---
+              # --- FIX: Broken Metadata / Build Backends ---
               
               aiohappyeyeballs = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
@@ -61,8 +61,7 @@
                     hash = "sha256-80m6j0t1yyXJnFwthOmX5IUgTSkCqVl4ArA3HwkzH7g=";
                   };
                 }
-              else
-                prev.aiohappyeyeballs.overridePythonAttrs (old: { preferWheel = true; });
+              else prev.aiohappyeyeballs.overridePythonAttrs (old: { preferWheel = true; });
 
               click = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
@@ -73,12 +72,26 @@
                     inherit pname version format;
                     dist = "py3";
                     python = "py3";
-                    # CORRECT HASH verified from logs
                     hash = "sha256-YaMmW5FOhQuFMX0LMQnH+M01pnD5Y4ZgBdbvHVF1oSs=";
                   };
                 }
-              else
-                prev.click.overridePythonAttrs (old: { preferWheel = true; });
+              else prev.click.overridePythonAttrs (old: { preferWheel = true; });
+
+              # Force wheel for docstring-parser to avoid "No module named hatchling"
+              docstring-parser = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "docstring_parser";
+                  version = "0.17.0"; # Version from your logs
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "py3";
+                    python = "py3";
+                    # Placeholder EEEE: CI will fail here first
+                    hash = "sha256-EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=";
+                  };
+                }
+              else prev.docstring-parser.overridePythonAttrs (old: { preferWheel = true; });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               
@@ -98,8 +111,7 @@
                     hash = "sha256-zpmgLLsNA3OzuaSBWoAZuA5nMg9mXWbY5qILE+7hucs=";
                   };
                 }
-              else 
-                prev.rpds-py.overridePythonAttrs (old: { preferWheel = true; });
+              else prev.rpds-py.overridePythonAttrs (old: { preferWheel = true; });
 
               watchfiles = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
@@ -118,8 +130,7 @@
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
-              else
-                prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
+              else prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
             });
 
             postFixup = ''
