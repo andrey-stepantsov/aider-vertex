@@ -69,7 +69,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # CORRECT HASH (Found in previous failure logs)
+                    # CORRECT HASH for rpds-py
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
                 }
@@ -98,7 +98,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # PLACEHOLDER: We need to trigger one more failure to get this hash
+                    # PLACEHOLDER: CI will fail here next, giving us the REAL watchfiles hash
                     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                   };
                 }
