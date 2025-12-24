@@ -100,6 +100,19 @@
                 '';
               });
 
+              # Fix jsonschema-specifications metadata error (hatchling backend)
+              jsonschema-specifications = prev.jsonschema-specifications.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.hatchling 
+                  pkgs.python311Packages.hatch-vcs 
+                ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/license-files/d' pyproject.toml
+                  fi
+                '';
+              });
+
               # Fix iniconfig metadata error
               iniconfig = prev.iniconfig.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
