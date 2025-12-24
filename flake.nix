@@ -60,6 +60,20 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
               
+              # NEW: Fix anyio metadata error (hatchling backend)
+              anyio = prev.anyio.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.hatchling 
+                  pkgs.python311Packages.hatch-vcs 
+                ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/^license/d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
+                  fi
+                '';
+              });
+
               # Fix attrs metadata error
               attrs = prev.attrs.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -73,7 +87,7 @@
                 '';
               });
 
-              # Fix iniconfig: Remove old license line completely, then add new table format
+              # Fix iniconfig metadata error
               iniconfig = prev.iniconfig.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -87,7 +101,7 @@
                 '';
               });
 
-              # Fix frozenlist: Remove old license line completely, then add new table format
+              # Fix frozenlist metadata error
               frozenlist = prev.frozenlist.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
