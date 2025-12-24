@@ -22,27 +22,27 @@
 
           # --- Header Management ---
 
-          # v0.23.0 (Modern): For tree-sitter-c-sharp and others expecting modern API
+          # v0.23.0 (Modern): For c-sharp and embedded-template
           treeSitter23Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
           };
-          treeSitter23Headers = pkgs.runCommand "tree-sitter-headers-0.23" { src = treeSitter23Src; } ''
+          # Extract parser.h specifically
+          treeSitter23Headers = pkgs.runCommand "tree-sitter-headers-0.23" { } ''
             mkdir -p $out/include/tree_sitter
-            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
-            cp $src/lib/src/*.h $out/include/tree_sitter/
+            cp ${treeSitter23Src}/lib/include/tree_sitter/*.h $out/include/tree_sitter/
+            cp ${treeSitter23Src}/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # v0.22.6 (Legacy): For tree-sitter-yaml which relies on 'abi_version' field
+          # v0.22.6 (Legacy): For yaml (needs 'abi_version' struct member)
           treeSitter22Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.22.6.tar.gz";
-            # Updated with the hash from your error log
             hash = "sha256-jBCKgDlvXwA7Z4GDBJ+aZc52zC+om30DtsZJuHado1s=";
           };
-          treeSitter22Headers = pkgs.runCommand "tree-sitter-headers-0.22" { src = treeSitter22Src; } ''
+          treeSitter22Headers = pkgs.runCommand "tree-sitter-headers-0.22" { } ''
             mkdir -p $out/include/tree_sitter
-            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
-            cp $src/lib/src/*.h $out/include/tree_sitter/
+            cp ${treeSitter22Src}/lib/include/tree_sitter/*.h $out/include/tree_sitter/
+            cp ${treeSitter22Src}/lib/src/*.h $out/include/tree_sitter/
           '';
 
           googleFix = old: {
@@ -74,7 +74,7 @@
 
               # --- FIX: Tree Sitter Builds ---
               
-              # C# uses 0.23 headers
+              # C# (Modern Headers)
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -87,25 +87,20 @@
                 '';
               });
 
-              # Embedded Template works with ABI3 wheel (Manual Fetch)
-              tree-sitter-embedded-template = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "tree_sitter_embedded_template"; 
-                  version = "0.23.2";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "cp39";
-                    python = "cp39";
-                    abi = "abi3";
-                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    sha256 = "5b0456e3f775214a157e44923f3149f542b546f668678fa6fdab79162b8cd0e3";
-                  };
-                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
-                }
-              else prev.tree-sitter-embedded-template;
+              # Embedded Template (Modern Headers)
+              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
+                preferWheel = true;
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools 
+                  pkgs.python311Packages.wheel
+                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                preBuild = (old.preBuild or "") + ''
+                  mkdir -p src/tree_sitter
+                  cp ${treeSitter23Headers}/include/tree_sitter/parser.h src/tree_sitter/parser.h
+                '';
+              });
 
-              # YAML uses 0.22 (Legacy) headers + Local Source path
+              # YAML (Legacy Headers + Local Source)
               tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -113,9 +108,11 @@
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 
-                # 1. Use 0.22 Headers (contains abi_version)
+                # 1. Inject Legacy Headers (0.22)
                 # 2. Add Absolute Path to local 'src' for schema.core.c
                 preBuild = (old.preBuild or "") + ''
+                  mkdir -p src/tree_sitter
+                  cp ${treeSitter22Headers}/include/tree_sitter/parser.h src/tree_sitter/parser.h
                   export CFLAGS="-I${treeSitter22Headers}/include -I$(pwd)/src $CFLAGS"
                 '';
               });
@@ -337,7 +334,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! PLACEHOLDER 3: Run build, get hash, replace here.
+                    # !!! PLACEHOLDER: Run build, copy 'got: sha256-...' hash, and paste here.
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
