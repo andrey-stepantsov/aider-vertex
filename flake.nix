@@ -60,6 +60,11 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
 
+              # NEW: Fix typing-inspection missing build backend
+              typing-inspection = prev.typing-inspection.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.hatchling ];
+              });
+
               # --- FIX: Tree Sitter Builds (Linux Only) ---
               tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
@@ -316,7 +321,6 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # CORRECT HASH INSERTED:
                     hash = "sha256-IoEWdK8DZrq9fPdl6b50jacuJb47rWYF+Pro/mgP67E=";
                   };
                 }
