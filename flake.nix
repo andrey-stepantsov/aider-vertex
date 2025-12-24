@@ -32,7 +32,6 @@
           '';
 
           # Fixes packages that use 'license = "String"' instead of 'license = { text = "String" }'
-          # which breaks modern flit_core builds.
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -59,12 +58,9 @@
               google-crc32c = prev.google-crc32c.overridePythonAttrs googleFix;
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
-              
-              # NEW: Fix typing-extensions metadata error
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
-              
               tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -89,7 +85,6 @@
                 '';
               }) else prev.tree-sitter-embedded-template;
 
-              # CRITICAL FIX: Upgrade tree-sitter-yaml source via GitHub
               tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 version = "0.7.1-git-latest";
                 src = pkgs.fetchFromGitHub {
@@ -107,7 +102,6 @@
               }) else prev.tree-sitter-yaml;
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
-              
               aiohappyeyeballs = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "aiohappyeyeballs";
@@ -291,7 +285,6 @@
               });
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
-              
               rpds-py = if pkgs.stdenv.isLinux then 
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "rpds_py";
@@ -323,8 +316,8 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! EXPECT FAILURE HERE NEXT !!!
-                    hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
+                    # CORRECT HASH INSERTED:
+                    hash = "sha256-IoEWdK8DZrq9fPdl6b50jacuJb47rWYF+Pro/mgP67E=";
                   };
                 }
               else prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
