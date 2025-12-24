@@ -31,9 +31,8 @@
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # Updated Google Fix: Patches metadata AND injects setuptools
+          # Standard Google Cloud package fix
           googleFix = old: {
-            nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
                 sed -i '/license = /d' pyproject.toml
@@ -52,7 +51,19 @@
 
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
               # --- Google Cloud & Metadata Fixes ---
-              google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
+              
+              # Specialized fix for aiplatform to ensure setuptools is present
+              google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/license = /d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
+                    sed -i '/license-files/d' pyproject.toml
+                  fi
+                '';
+              });
+
               google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
               google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
               google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
@@ -60,21 +71,8 @@
               google-crc32c = prev.google-crc32c.overridePythonAttrs googleFix;
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
-              
-              # Fix typing-extensions metadata error
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
-
-              # Fix posthog metadata error
-              posthog = prev.posthog.overridePythonAttrs (old: {
-                postPatch = (old.postPatch or "") + ''
-                   if [ -f pyproject.toml ]; then
-                    sed -i '/license-files/d' pyproject.toml
-                    sed -i '/license = /d' pyproject.toml
-                    sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
-                  fi
-                '';
-              });
-
+              
               # Fix anyio metadata error
               anyio = prev.anyio.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -115,7 +113,7 @@
                 '';
               });
 
-              # Fix referencing metadata error
+              # Fix referencing metadata error (hatchling backend)
               referencing = prev.referencing.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -128,7 +126,7 @@
                 '';
               });
 
-              # Fix jsonschema-specifications metadata error
+              # Fix jsonschema-specifications metadata error (hatchling backend)
               jsonschema-specifications = prev.jsonschema-specifications.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -220,6 +218,17 @@
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
                 postPatch = (old.postPatch or "") + ''
                   if [ -f pyproject.toml ]; then
+                    sed -i '/license = /d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
+                  fi
+                '';
+              });
+
+              # Fix posthog metadata error
+              posthog = prev.posthog.overridePythonAttrs (old: {
+                postPatch = (old.postPatch or "") + ''
+                   if [ -f pyproject.toml ]; then
+                    sed -i '/license-files/d' pyproject.toml
                     sed -i '/license = /d' pyproject.toml
                     sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
                   fi
