@@ -103,7 +103,7 @@
                 '';
               });
 
-              # Fix referencing metadata error (hatchling backend)
+              # Fix referencing metadata error
               referencing = prev.referencing.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -116,7 +116,7 @@
                 '';
               });
 
-              # Fix jsonschema-specifications metadata error (hatchling backend)
+              # Fix jsonschema-specifications metadata error
               jsonschema-specifications = prev.jsonschema-specifications.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -247,9 +247,14 @@
                 '';
               });
 
-              # NEW: Fix tiktoken (Rust build) - ONLY FOR LINUX (Source build)
-              # On Darwin, we use wheels, so this override is skipped to avoid "cannot unpack wheel" errors.
+              # NEW: Fix tiktoken (Rust build) - ONLY FOR LINUX
               tiktoken = if pkgs.stdenv.isLinux then prev.tiktoken.overridePythonAttrs (old: {
+                src = pkgs.fetchFromGitHub {
+                  owner = "openai";
+                  repo = "tiktoken";
+                  rev = "0.10.0";
+                  hash = "sha256-V/61n/oV25L2ZfD9uv6WqT9l4u402yM5p7Cg8L11uXk=";
+                };
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools
                   pkgs.python311Packages.setuptools-rust
@@ -258,9 +263,14 @@
                   pkgs.rustPlatform.cargoSetupHook
                 ];
                 cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
-                  inherit (old) src;
+                  src = pkgs.fetchFromGitHub {
+                    owner = "openai";
+                    repo = "tiktoken";
+                    rev = "0.10.0";
+                    hash = "sha256-V/61n/oV25L2ZfD9uv6WqT9l4u402yM5p7Cg8L11uXk=";
+                  };
                   name = "${old.pname}-${old.version}";
-                  # Placeholder hash to trigger failure on CI and get the real one
+                  # Placeholder hash to trigger failure and get the real one
                   hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                 };
               }) else prev.tiktoken;
