@@ -30,9 +30,7 @@
           # Moves lib/src/parser.h -> include/tree_sitter/parser.h
           treeSitterHeaders = pkgs.runCommand "tree-sitter-headers-0.23.0" { src = treeSitterSrc; } ''
             mkdir -p $out/include/tree_sitter
-            # Copy public API headers (api.h)
             cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
-            # Copy internal headers (parser.h) which are needed by generated code
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
@@ -63,8 +61,7 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Tree Sitter (Header Compatibility) ---
-              # We use the manually rearranged headers so '#include "tree_sitter/parser.h"' works.
+              # --- FIX: Tree Sitter (Header Compatibility + Build Deps) ---
               
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
@@ -72,8 +69,6 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                
-                # Inject the custom header path
                 preBuild = (old.preBuild or "") + ''
                   export CFLAGS="-I${treeSitterHeaders}/include $CFLAGS"
                 '';
@@ -85,8 +80,17 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                
-                # Inject the custom header path
+                preBuild = (old.preBuild or "") + ''
+                  export CFLAGS="-I${treeSitterHeaders}/include $CFLAGS"
+                '';
+              });
+
+              tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
+                preferWheel = true;
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools 
+                  pkgs.python311Packages.wheel
+                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 preBuild = (old.preBuild or "") + ''
                   export CFLAGS="-I${treeSitterHeaders}/include $CFLAGS"
                 '';
