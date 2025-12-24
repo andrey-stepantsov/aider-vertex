@@ -60,7 +60,7 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
               
-              # NEW: Fix anyio metadata error (hatchling backend)
+              # Fix anyio metadata error
               anyio = prev.anyio.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -76,6 +76,19 @@
 
               # Fix attrs metadata error
               attrs = prev.attrs.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.hatchling 
+                  pkgs.python311Packages.hatch-vcs 
+                ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/license-files/d' pyproject.toml
+                  fi
+                '';
+              });
+
+              # Fix referencing metadata error (hatchling backend)
+              referencing = prev.referencing.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
                   pkgs.python311Packages.hatch-vcs 
