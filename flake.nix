@@ -31,7 +31,7 @@
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # Fixes packages that use 'license = "String"' instead of 'license = { text = "String" }'
+          # Standard Google Cloud package fix
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -60,7 +60,7 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
               
-              # Fix attrs metadata error (hatchling backend)
+              # Fix attrs: Uses hatchling, invalid license-files key
               attrs = prev.attrs.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -73,7 +73,7 @@
                 '';
               });
 
-              # NEW: Fix iniconfig metadata error (hatchling backend)
+              # Fix iniconfig: Uses hatchling, string license "MIT" needs to be table
               iniconfig = prev.iniconfig.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -81,25 +81,37 @@
                 ];
                 postPatch = (old.postPatch or "") + ''
                   if [ -f pyproject.toml ]; then
-                    sed -i '/license = /d' pyproject.toml
-                    sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
+                    # Robust replacement of license line
+                    sed -i 's/^license.*=.*$/license = { text = "MIT" }/' pyproject.toml
                   fi
                 '';
               });
 
-              # Aggressive Fix for Pillow 11.3.0
+              # Fix frozenlist: Uses hatchling, string license "Apache-2.0" needs to be table
+              frozenlist = prev.frozenlist.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.hatchling 
+                  pkgs.python311Packages.hatch-vcs 
+                ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i 's/^license.*=.*$/license = { text = "Apache-2.0" }/' pyproject.toml
+                  fi
+                '';
+              });
+
+              # Fix Pillow: Uses flit-core, mixed license keys
               pillow = prev.pillow.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.flit-core ];
                 postPatch = (old.postPatch or "") + ''
                   if [ -f pyproject.toml ]; then
                     sed -i '/license-files/d' pyproject.toml
-                    sed -i '/license = /d' pyproject.toml
-                    sed -i '/\[project\]/a license = {text = "HPND"}' pyproject.toml
+                    sed -i 's/^license.*=.*$/license = { text = "HPND" }/' pyproject.toml
                   fi
                 '';
               });
 
-              # Fix typing-inspection missing build backend & strict metadata error
+              # Fix typing-inspection: Uses hatchling, invalid license-files key
               typing-inspection = prev.typing-inspection.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.hatchling ];
                 postPatch = (old.postPatch or "") + ''
@@ -109,13 +121,12 @@
                 '';
               });
 
-              # Fix tree-sitter-language-pack missing setuptools AND metadata error
+              # Fix tree-sitter-language-pack: Missing setuptools, invalid license string
               tree-sitter-language-pack = prev.tree-sitter-language-pack.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
                 postPatch = (old.postPatch or "") + ''
                   if [ -f pyproject.toml ]; then
-                    sed -i '/license = /d' pyproject.toml
-                    sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
+                    sed -i 's/^license.*=.*$/license = { text = "MIT" }/' pyproject.toml
                   fi
                 '';
               });
