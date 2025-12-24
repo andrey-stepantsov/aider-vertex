@@ -21,9 +21,6 @@
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
           # --- Header Management (Linux Only) ---
-          # (Retained for C# and Embedded Template, but removed for YAML)
-
-          # v0.23.0 (Modern)
           treeSitter23Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
@@ -87,16 +84,18 @@
                 '';
               }) else prev.tree-sitter-embedded-template;
 
-              # CRITICAL FIX: Upgrade tree-sitter-yaml source
-              # We stop trying to patch the old version and just use 0.9.0 which is compatible
+              # CRITICAL FIX: Upgrade tree-sitter-yaml source via GitHub
+              # Fetching 'master' to ensure we get the latest C code compatible with GCC 14
               tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
-                version = "0.9.0";
-                src = pkgs.fetchPypi {
-                  pname = "tree-sitter-yaml";
-                  version = "0.9.0";
-                  hash = "sha256-sC/sD7zYz+QPb9IXm7V+c0ve+O3Ovb3wK3b6/sM5E+k=";
+                version = "0.7.1-git-latest";
+                src = pkgs.fetchFromGitHub {
+                   owner = "tree-sitter-grammars";
+                   repo = "tree-sitter-yaml";
+                   # This is the latest commit as of late 2024, generally safer than PyPI for strict compilation
+                   rev = "master"; 
+                   # !!! REPLACE THIS HASH AFTER FIRST RUN FAIL !!!
+                   hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                 };
-                # Remove the complex preBuild hacks, they are not needed for 0.9.0
                 preBuild = "";
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -322,7 +321,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! WARNING: THIS WILL FAIL NEXT IF YOU DONT REPLACE IT
+                    # !!! REPLACE THIS HASH AFTER SECOND RUN FAIL !!!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
