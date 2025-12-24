@@ -20,18 +20,16 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
-          # 1. Fetch Source
+          # 1. Fetch Tree-Sitter 0.23.0 Source (for parser.h)
           treeSitterSrc = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
           };
 
-          # 2. Create a "Corrected" Header Directory
-          # Moves lib/src/parser.h -> include/tree_sitter/parser.h
-          treeSitterHeaders = pkgs.runCommand "tree-sitter-headers-0.23.0" { src = treeSitterSrc; } ''
-            mkdir -p $out/include/tree_sitter
-            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
-            cp $src/lib/src/*.h $out/include/tree_sitter/
+          # 2. Extract parser.h specifically
+          parserHeader = pkgs.runCommand "parser-header" { } ''
+            mkdir -p $out
+            cp ${treeSitterSrc}/lib/src/parser.h $out/
           '';
 
           googleFix = old: {
@@ -61,30 +59,42 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Tree Sitter (Header Compatibility + Build Deps) ---
+              # --- FIX: Tree Sitter (Manual File Injection) ---
               
+              # C# Fix: Inject parser.h directly into source tree
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                
+                # Copy the header file to where the compiler expects it (src/tree_sitter/parser.h)
                 preBuild = (old.preBuild or "") + ''
-                  export CFLAGS="-I${treeSitterHeaders}/include $CFLAGS"
+                  mkdir -p src/tree_sitter
+                  cp ${parserHeader}/parser.h src/tree_sitter/parser.h
                 '';
               });
 
-              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
-                preferWheel = true;
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
-                  pkgs.python311Packages.setuptools 
-                  pkgs.python311Packages.wheel
-                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                preBuild = (old.preBuild or "") + ''
-                  export CFLAGS="-I${treeSitterHeaders}/include $CFLAGS"
-                '';
-              });
+              # Embedded Template Fix: Keep using the working Wheel
+              tree-sitter-embedded-template = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "tree_sitter_embedded_template"; 
+                  version = "0.23.2";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp39";
+                    python = "cp39";
+                    abi = "abi3";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    hash = "sha256-5b0456e3f775214a157e44923f3149f542b546f668678fa6fdab79162b8cd0e3=";
+                  };
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+                }
+              else prev.tree-sitter-embedded-template;
 
+              # YAML Fix: Inject parser.h AND Symlink schema.core.c
               tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -92,9 +102,15 @@
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 
-                # YAML needs headers AND its own local src directory included (absolute path)
+                # 1. Inject parser.h
+                # 2. Fix the missing schema.core.c by pointing it to generated schema
                 preBuild = (old.preBuild or "") + ''
-                  export CFLAGS="-I${treeSitterHeaders}/include -I$(pwd)/src $CFLAGS"
+                  mkdir -p src/tree_sitter
+                  cp ${parserHeader}/parser.h src/tree_sitter/parser.h
+                  
+                  if [ -f src/schema.generated.c ]; then
+                    ln -sf schema.generated.c src/schema.core.c
+                  fi
                 '';
               });
 
