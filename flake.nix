@@ -31,7 +31,7 @@
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # Standard Google Cloud package fix
+          # Fixes packages that use 'license = "String"' instead of 'license = { text = "String" }'
           googleFix = old: {
             # Ensure setuptools is present for all Google packages
             nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
@@ -48,7 +48,7 @@
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
-            preferWheels = pkgs.stdenv.isDarwin;
+            preferWheels = true; # GLOBAL PREFERENCE FOR WHEELS
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
@@ -247,33 +247,13 @@
                 '';
               });
 
-              # NEW: Fix tiktoken (Rust build) - ONLY FOR LINUX
-              tiktoken = if pkgs.stdenv.isLinux then prev.tiktoken.overridePythonAttrs (old: {
-                src = pkgs.fetchFromGitHub {
-                  owner = "openai";
-                  repo = "tiktoken";
-                  rev = "0.10.0";
-                  hash = "sha256-V/61n/oV25L2ZfD9uv6WqT9l4u402yM5p7Cg8L11uXk=";
-                };
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
-                  pkgs.python311Packages.setuptools
-                  pkgs.python311Packages.setuptools-rust
-                  pkgs.cargo
-                  pkgs.rustc
-                  pkgs.rustPlatform.cargoSetupHook
-                ];
-                cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
-                  src = pkgs.fetchFromGitHub {
-                    owner = "openai";
-                    repo = "tiktoken";
-                    rev = "0.10.0";
-                    hash = "sha256-V/61n/oV25L2ZfD9uv6WqT9l4u402yM5p7Cg8L11uXk=";
-                  };
-                  name = "${old.pname}-${old.version}";
-                  # Placeholder hash to trigger failure and get the real one
-                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-                };
-              }) else prev.tiktoken;
+              # FIX: Use Wheels for tiktoken on ALL systems to avoid Rust build issues
+              tiktoken = prev.tiktoken.overridePythonAttrs (old: {
+                preferWheel = true;
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ 
+                  pkgs.autoPatchelfHook 
+                ]);
+              });
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
               tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
