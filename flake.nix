@@ -87,6 +87,19 @@
                 '';
               });
 
+              # Fix jsonschema metadata error
+              jsonschema = prev.jsonschema.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.hatchling 
+                  pkgs.python311Packages.hatch-vcs 
+                ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/license-files/d' pyproject.toml
+                  fi
+                '';
+              });
+
               # Fix referencing metadata error (hatchling backend)
               referencing = prev.referencing.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
