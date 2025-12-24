@@ -68,33 +68,17 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                
+                # Copy the header file to where the compiler expects it (src/tree_sitter/parser.h)
                 preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
                   cp ${parserHeader}/parser.h src/tree_sitter/parser.h
                 '';
               });
 
-              # Embedded Template Fix: Keep using the working Wheel (Fixed Hash Syntax)
-              tree-sitter-embedded-template = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "tree_sitter_embedded_template"; 
-                  version = "0.23.2";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "cp39";
-                    python = "cp39";
-                    abi = "abi3";
-                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
-                    # Changed 'hash' to 'sha256' to accept hex string
-                    sha256 = "5b0456e3f775214a157e44923f3149f542b546f668678fa6fdab79162b8cd0e3";
-                  };
-                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
-                }
-              else prev.tree-sitter-embedded-template;
-
-              # YAML Fix: Inject parser.h AND Attempt Auto-Symlink
-              tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
+              # Embedded Template Fix: Use source build + parser.h injection
+              # This worked in previous builds, so we stick to it.
+              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
@@ -104,14 +88,27 @@
                 preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
                   cp ${parserHeader}/parser.h src/tree_sitter/parser.h
+                '';
+              });
+
+              # YAML Fix: Inject parser.h AND Symlink schema.core.c
+              tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
+                preferWheel = true;
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools 
+                  pkgs.python311Packages.wheel
+                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                
+                # 1. Inject parser.h
+                # 2. Fix the missing schema.core.c by pointing it to generated schema
+                preBuild = (old.preBuild or "") + ''
+                  mkdir -p src/tree_sitter
+                  cp ${parserHeader}/parser.h src/tree_sitter/parser.h
                   
-                  # Debug: List what's actually inside src/
-                  echo "Listing src directory content:"
+                  # Debug: List src to confirm filename
                   ls -R src/
                   
-                  # Attempt to find the schema file and symlink it to what scanner.c expects
-                  # scanner.c expects: schema.core.c
-                  # We search for any 'schema*.c' that isn't schema.core.c and link it.
+                  # Symlink the generated schema so scanner.c can find it as "schema.core.c"
                   find src -name "schema*.c" ! -name "schema.core.c" -exec ln -sf {} src/schema.core.c \;
                 '';
               });
