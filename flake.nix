@@ -60,17 +60,12 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
               
-              # NEW: Aggressive Fix for Pillow 11.3.0
-              # Pillow uses a mix of setuptools/flit configuration that confuses poetry2nix's hooks.
-              # We explicitly strip the 'license-files' key which setuptools > 61 doesn't like in [project].
+              # Aggressive Fix for Pillow 11.3.0
               pillow = prev.pillow.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.flit-core ];
                 postPatch = (old.postPatch or "") + ''
                   if [ -f pyproject.toml ]; then
-                    # Remove the invalid license-files key
                     sed -i '/license-files/d' pyproject.toml
-                    
-                    # Fix the license string issue
                     sed -i '/license = /d' pyproject.toml
                     sed -i '/\[project\]/a license = {text = "HPND"}' pyproject.toml
                   fi
@@ -92,7 +87,6 @@
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
                 postPatch = (old.postPatch or "") + ''
                   if [ -f pyproject.toml ]; then
-                    # Fix invalid license string format
                     sed -i '/license = /d' pyproject.toml
                     sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
                   fi
@@ -352,6 +346,8 @@
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
                   nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
+                  # Explicitly propagate dependencies to fix runtime check
+                  propagatedBuildInputs = [ pkgs.python311Packages.anyio ];
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
