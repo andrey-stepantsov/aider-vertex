@@ -33,6 +33,8 @@
 
           # Standard Google Cloud package fix
           googleFix = old: {
+            # Ensure setuptools is present for all Google packages
+            nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
                 sed -i '/license = /d' pyproject.toml
@@ -51,19 +53,7 @@
 
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
               # --- Google Cloud & Metadata Fixes ---
-              
-              # Specialized fix for aiplatform to ensure setuptools is present
-              google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs (old: {
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
-                postPatch = (old.postPatch or "") + ''
-                  if [ -f pyproject.toml ]; then
-                    sed -i '/license = /d' pyproject.toml
-                    sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
-                    sed -i '/license-files/d' pyproject.toml
-                  fi
-                '';
-              });
-
+              google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
               google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
               google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
               google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
@@ -235,7 +225,7 @@
                 '';
               });
 
-              # Pre-emptively fix multidict (likely same issue as frozenlist/yarl)
+              # Pre-emptively fix multidict
               multidict = prev.multidict.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
                 postPatch = (old.postPatch or "") + ''
@@ -246,7 +236,7 @@
                 '';
               });
 
-              # Pre-emptively fix yarl (likely same issue)
+              # Pre-emptively fix yarl
               yarl = prev.yarl.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
                 postPatch = (old.postPatch or "") + ''
@@ -256,6 +246,24 @@
                   fi
                 '';
               });
+
+              # NEW: Fix tiktoken (Rust build) - ONLY FOR LINUX (Source build)
+              # On Darwin, we use wheels, so this override is skipped to avoid "cannot unpack wheel" errors.
+              tiktoken = if pkgs.stdenv.isLinux then prev.tiktoken.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools
+                  pkgs.python311Packages.setuptools-rust
+                  pkgs.cargo
+                  pkgs.rustc
+                  pkgs.rustPlatform.cargoSetupHook
+                ];
+                cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
+                  inherit (old) src;
+                  name = "${old.pname}-${old.version}";
+                  # Placeholder hash to trigger failure on CI and get the real one
+                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                };
+              }) else prev.tiktoken;
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
               tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
