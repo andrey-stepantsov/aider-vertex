@@ -31,7 +31,7 @@
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # Fixes packages that use 'license = "String"' instead of 'license = { text = "String" }'
+          # Standard Google Cloud package fix
           googleFix = old: {
             # Ensure setuptools is present for all Google packages
             nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
@@ -247,13 +247,32 @@
                 '';
               });
 
-              # FIX: Use Wheels for tiktoken on ALL systems to avoid Rust build issues
-              tiktoken = prev.tiktoken.overridePythonAttrs (old: {
-                preferWheel = true;
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ 
-                  pkgs.autoPatchelfHook 
-                ]);
-              });
+              # FIX: Use Wheels for tiktoken on ALL systems
+              tiktoken = if pkgs.stdenv.isLinux then prev.tiktoken.overridePythonAttrs (old: {
+                src = pkgs.fetchFromGitHub {
+                  owner = "openai";
+                  repo = "tiktoken";
+                  rev = "0.10.0";
+                  hash = "sha256-V/61n/oV25L2ZfD9uv6WqT9l4u402yM5p7Cg8L11uXk=";
+                };
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools
+                  pkgs.python311Packages.setuptools-rust
+                  pkgs.cargo
+                  pkgs.rustc
+                  pkgs.rustPlatform.cargoSetupHook
+                ];
+                cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
+                  src = pkgs.fetchFromGitHub {
+                    owner = "openai";
+                    repo = "tiktoken";
+                    rev = "0.10.0";
+                    hash = "sha256-V/61n/oV25L2ZfD9uv6WqT9l4u402yM5p7Cg8L11uXk=";
+                  };
+                  name = "${old.pname}-${old.version}";
+                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                };
+              }) else prev.tiktoken;
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
               tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
@@ -280,8 +299,10 @@
                 '';
               }) else prev.tree-sitter-embedded-template;
 
+              # FIX: Use Source for tree-sitter-yaml on Linux
               tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 version = "0.7.1-git-latest";
+                preferWheel = false; # Explicitly disable wheel preference for this override
                 src = pkgs.fetchFromGitHub {
                    owner = "tree-sitter-grammars";
                    repo = "tree-sitter-yaml";
@@ -289,7 +310,6 @@
                    hash = "sha256-BX6TOfAZLW+0h2TNsgsLC9K2lfirraCWlBN2vCKiXQ4=";
                 };
                 preBuild = "";
-                preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
