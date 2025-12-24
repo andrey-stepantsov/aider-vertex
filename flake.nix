@@ -31,8 +31,9 @@
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # Fixes packages that use 'license = "String"' instead of 'license = { text = "String" }'
+          # Updated Google Fix: Patches metadata AND injects setuptools
           googleFix = old: {
+            nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
                 sed -i '/license = /d' pyproject.toml
@@ -58,11 +59,12 @@
               google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
               google-crc32c = prev.google-crc32c.overridePythonAttrs googleFix;
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
-              
-              # NEW: Fix google-cloud-bigquery metadata error
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               
-              # NEW: Pre-emptively fix posthog (likely similar issues)
+              # Fix typing-extensions metadata error
+              typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
+
+              # Fix posthog metadata error
               posthog = prev.posthog.overridePythonAttrs (old: {
                 postPatch = (old.postPatch or "") + ''
                    if [ -f pyproject.toml ]; then
@@ -73,8 +75,6 @@
                 '';
               });
 
-              typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
-              
               # Fix anyio metadata error
               anyio = prev.anyio.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -115,7 +115,7 @@
                 '';
               });
 
-              # Fix referencing metadata error (hatchling backend)
+              # Fix referencing metadata error
               referencing = prev.referencing.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -128,7 +128,7 @@
                 '';
               });
 
-              # Fix jsonschema-specifications metadata error (hatchling backend)
+              # Fix jsonschema-specifications metadata error
               jsonschema-specifications = prev.jsonschema-specifications.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.hatchling 
@@ -222,6 +222,28 @@
                   if [ -f pyproject.toml ]; then
                     sed -i '/license = /d' pyproject.toml
                     sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
+                  fi
+                '';
+              });
+
+              # Pre-emptively fix multidict (likely same issue as frozenlist/yarl)
+              multidict = prev.multidict.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/^license/d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
+                  fi
+                '';
+              });
+
+              # Pre-emptively fix yarl (likely same issue)
+              yarl = prev.yarl.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/^license/d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
                   fi
                 '';
               });
