@@ -60,8 +60,22 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
               
-              # NEW: Fix Pillow metadata error
-              pillow = prev.pillow.overridePythonAttrs googleFix;
+              # NEW: Aggressive Fix for Pillow 11.3.0
+              # Pillow uses a mix of setuptools/flit configuration that confuses poetry2nix's hooks.
+              # We explicitly strip the 'license-files' key which setuptools > 61 doesn't like in [project].
+              pillow = prev.pillow.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.flit-core ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    # Remove the invalid license-files key
+                    sed -i '/license-files/d' pyproject.toml
+                    
+                    # Fix the license string issue
+                    sed -i '/license = /d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "HPND"}' pyproject.toml
+                  fi
+                '';
+              });
 
               # Fix typing-inspection missing build backend & strict metadata error
               typing-inspection = prev.typing-inspection.overridePythonAttrs (old: {
