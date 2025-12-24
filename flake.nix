@@ -22,7 +22,7 @@
 
           # --- Header Management (Linux Only) ---
 
-          # v0.23.0 (Modern): For tree-sitter-c-sharp
+          # v0.23.0 (Modern)
           treeSitter23Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
@@ -33,7 +33,7 @@
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # v0.22.6 (Legacy): For tree-sitter-yaml
+          # v0.22.6 (Legacy)
           treeSitter22Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.22.6.tar.gz";
             hash = "sha256-jBCKgDlvXwA7Z4GDBJ+aZc52zC+om30DtsZJuHado1s=";
@@ -72,7 +72,6 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
-              # macOS uses wheels, so we MUST skip these overrides there.
               
               tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
@@ -105,15 +104,14 @@
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 
-                # 1. Inject Legacy Headers (0.22)
-                # 2. Add Absolute Path to local 'src' for schema.core.c
-                # 3. Patch parser.c to rename .abi_version -> .version
                 preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
                   cp ${treeSitter22Headers}/include/tree_sitter/*.h src/tree_sitter/
                   
                   export CFLAGS="-I${treeSitter22Headers}/include -I$(pwd)/src $CFLAGS"
-                  sed -i 's/\.abi_version =/.version =/' src/parser.c
+                  
+                  # Robustly replace .abi_version with .version
+                  sed -i 's/\.abi_version/.version/g' src/parser.c
                 '';
               }) else prev.tree-sitter-yaml;
 
@@ -334,7 +332,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! PLACEHOLDER: Run build, copy 'got: sha256-...' hash, and paste here.
+                    # !!! PLACEHOLDER 3: Run build, get hash, replace here.
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
