@@ -60,15 +60,19 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
 
-              # NEW: Fix typing-inspection missing build backend & strict metadata error
+              # Fix typing-inspection missing build backend & strict metadata error
               typing-inspection = prev.typing-inspection.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.hatchling ];
                 postPatch = (old.postPatch or "") + ''
                   if [ -f pyproject.toml ]; then
-                    # Fix Hatchling error: "Field project.license-files must be a table"
                     sed -i '/license-files/d' pyproject.toml
                   fi
                 '';
+              });
+
+              # NEW: Fix tree-sitter-language-pack missing setuptools
+              tree-sitter-language-pack = prev.tree-sitter-language-pack.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
               });
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
