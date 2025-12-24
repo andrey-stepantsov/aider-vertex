@@ -21,6 +21,7 @@
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
           # --- Header Management (Linux Only) ---
+          # (Retained for C# and Embedded Template, but removed for YAML)
 
           # v0.23.0 (Modern)
           treeSitter23Src = pkgs.fetchzip {
@@ -28,17 +29,6 @@
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
           };
           treeSitter23Headers = pkgs.runCommand "tree-sitter-headers-0.23" { src = treeSitter23Src; } ''
-            mkdir -p $out/include/tree_sitter
-            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
-            cp $src/lib/src/*.h $out/include/tree_sitter/
-          '';
-
-          # v0.22.6 (Legacy)
-          treeSitter22Src = pkgs.fetchzip {
-            url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.22.6.tar.gz";
-            hash = "sha256-jBCKgDlvXwA7Z4GDBJ+aZc52zC+om30DtsZJuHado1s=";
-          };
-          treeSitter22Headers = pkgs.runCommand "tree-sitter-headers-0.22" { src = treeSitter22Src; } ''
             mkdir -p $out/include/tree_sitter
             cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
             cp $src/lib/src/*.h $out/include/tree_sitter/
@@ -97,22 +87,22 @@
                 '';
               }) else prev.tree-sitter-embedded-template;
 
+              # CRITICAL FIX: Upgrade tree-sitter-yaml source
+              # We stop trying to patch the old version and just use 0.9.0 which is compatible
               tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
+                version = "0.9.0";
+                src = pkgs.fetchPypi {
+                  pname = "tree-sitter-yaml";
+                  version = "0.9.0";
+                  hash = "sha256-sC/sD7zYz+QPb9IXm7V+c0ve+O3Ovb3wK3b6/sM5E+k=";
+                };
+                # Remove the complex preBuild hacks, they are not needed for 0.9.0
+                preBuild = "";
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                
-                preBuild = (old.preBuild or "") + ''
-                  mkdir -p src/tree_sitter
-                  cp ${treeSitter22Headers}/include/tree_sitter/*.h src/tree_sitter/
-                  
-                  export CFLAGS="-I${treeSitter22Headers}/include -I$(pwd)/src $CFLAGS"
-                  
-                  # Robustly replace .abi_version with .version
-                  sed -i 's/\.abi_version/.version/g' src/parser.c
-                '';
               }) else prev.tree-sitter-yaml;
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
@@ -332,7 +322,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! PLACEHOLDER 3: Run build, get hash, replace here.
+                    # !!! WARNING: THIS WILL FAIL NEXT IF YOU DONT REPLACE IT
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
