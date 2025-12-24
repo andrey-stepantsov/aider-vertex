@@ -20,16 +20,29 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
-          # 1. Fetch Tree-Sitter 0.23.0 Source (for parser.h)
-          treeSitterSrc = pkgs.fetchzip {
+          # --- Header Management ---
+
+          # v0.23.0 (Modern): For tree-sitter-c-sharp and others expecting modern API
+          treeSitter23Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
           };
+          treeSitter23Headers = pkgs.runCommand "tree-sitter-headers-0.23" { src = treeSitter23Src; } ''
+            mkdir -p $out/include/tree_sitter
+            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
+            cp $src/lib/src/*.h $out/include/tree_sitter/
+          '';
 
-          # 2. Extract parser.h specifically
-          parserHeader = pkgs.runCommand "parser-header" { } ''
-            mkdir -p $out
-            cp ${treeSitterSrc}/lib/src/parser.h $out/
+          # v0.22.6 (Legacy): For tree-sitter-yaml which relies on 'abi_version' field
+          treeSitter22Src = pkgs.fetchzip {
+            url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.22.6.tar.gz";
+            # Updated with the hash from your error log
+            hash = "sha256-jBCKgDlvXwA7Z4GDBJ+aZc52zC+om30DtsZJuHado1s=";
+          };
+          treeSitter22Headers = pkgs.runCommand "tree-sitter-headers-0.22" { src = treeSitter22Src; } ''
+            mkdir -p $out/include/tree_sitter
+            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
+            cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
           googleFix = old: {
@@ -59,39 +72,40 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Tree Sitter (Manual File Injection) ---
+              # --- FIX: Tree Sitter Builds ---
               
-              # C# Fix: Inject parser.h directly into source tree
+              # C# uses 0.23 headers
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                
-                # Copy the header file to where the compiler expects it (src/tree_sitter/parser.h)
                 preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
-                  cp ${parserHeader}/parser.h src/tree_sitter/parser.h
+                  cp ${treeSitter23Headers}/include/tree_sitter/parser.h src/tree_sitter/parser.h
                 '';
               });
 
-              # Embedded Template Fix: Use source build + parser.h injection
-              # This worked in previous builds, so we stick to it.
-              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
-                preferWheel = true;
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
-                  pkgs.python311Packages.setuptools 
-                  pkgs.python311Packages.wheel
-                ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                
-                preBuild = (old.preBuild or "") + ''
-                  mkdir -p src/tree_sitter
-                  cp ${parserHeader}/parser.h src/tree_sitter/parser.h
-                '';
-              });
+              # Embedded Template works with ABI3 wheel (Manual Fetch)
+              tree-sitter-embedded-template = if pkgs.stdenv.isLinux then
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "tree_sitter_embedded_template"; 
+                  version = "0.23.2";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp39";
+                    python = "cp39";
+                    abi = "abi3";
+                    platform = "manylinux_2_17_x86_64.manylinux2014_x86_64";
+                    sha256 = "5b0456e3f775214a157e44923f3149f542b546f668678fa6fdab79162b8cd0e3";
+                  };
+                  nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+                }
+              else prev.tree-sitter-embedded-template;
 
-              # YAML Fix: Inject parser.h AND Symlink schema.core.c
+              # YAML uses 0.22 (Legacy) headers + Local Source path
               tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -99,17 +113,10 @@
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 
-                # 1. Inject parser.h
-                # 2. Fix the missing schema.core.c by pointing it to generated schema
+                # 1. Use 0.22 Headers (contains abi_version)
+                # 2. Add Absolute Path to local 'src' for schema.core.c
                 preBuild = (old.preBuild or "") + ''
-                  mkdir -p src/tree_sitter
-                  cp ${parserHeader}/parser.h src/tree_sitter/parser.h
-                  
-                  # Debug: List src to confirm filename
-                  ls -R src/
-                  
-                  # Symlink the generated schema so scanner.c can find it as "schema.core.c"
-                  find src -name "schema*.c" ! -name "schema.core.c" -exec ln -sf {} src/schema.core.c \;
+                  export CFLAGS="-I${treeSitter22Headers}/include -I$(pwd)/src $CFLAGS"
                 '';
               });
 
@@ -330,7 +337,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! PLACEHOLDER: Run build, copy 'got: sha256-...' hash, and paste here.
+                    # !!! PLACEHOLDER 3: Run build, get hash, replace here.
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
