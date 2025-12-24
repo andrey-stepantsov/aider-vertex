@@ -60,6 +60,19 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
               
+              # NEW: Fix attrs metadata error (hatchling backend)
+              attrs = prev.attrs.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.hatchling 
+                  pkgs.python311Packages.hatch-vcs 
+                ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/license-files/d' pyproject.toml
+                  fi
+                '';
+              });
+
               # Aggressive Fix for Pillow 11.3.0
               pillow = prev.pillow.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.flit-core ];
@@ -346,7 +359,6 @@
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
                   nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
-                  # Explicitly propagate dependencies to fix runtime check
                   propagatedBuildInputs = [ pkgs.python311Packages.anyio ];
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
