@@ -22,27 +22,26 @@
 
           # --- Header Management ---
 
-          # v0.23.0 (Modern): For c-sharp and embedded-template
+          # v0.23.0 (Modern)
           treeSitter23Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
           };
-          # Extract parser.h specifically
-          treeSitter23Headers = pkgs.runCommand "tree-sitter-headers-0.23" { } ''
+          treeSitter23Headers = pkgs.runCommand "tree-sitter-headers-0.23" { src = treeSitter23Src; } ''
             mkdir -p $out/include/tree_sitter
-            cp ${treeSitter23Src}/lib/include/tree_sitter/*.h $out/include/tree_sitter/
-            cp ${treeSitter23Src}/lib/src/*.h $out/include/tree_sitter/
+            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
+            cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # v0.22.6 (Legacy): For yaml (needs 'abi_version' struct member)
+          # v0.22.6 (Legacy)
           treeSitter22Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.22.6.tar.gz";
             hash = "sha256-jBCKgDlvXwA7Z4GDBJ+aZc52zC+om30DtsZJuHado1s=";
           };
-          treeSitter22Headers = pkgs.runCommand "tree-sitter-headers-0.22" { } ''
+          treeSitter22Headers = pkgs.runCommand "tree-sitter-headers-0.22" { src = treeSitter22Src; } ''
             mkdir -p $out/include/tree_sitter
-            cp ${treeSitter22Src}/lib/include/tree_sitter/*.h $out/include/tree_sitter/
-            cp ${treeSitter22Src}/lib/src/*.h $out/include/tree_sitter/
+            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
+            cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
           googleFix = old: {
@@ -74,7 +73,7 @@
 
               # --- FIX: Tree Sitter Builds ---
               
-              # C# (Modern Headers)
+              # C# (Modern Headers - Copy ALL headers)
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -83,11 +82,11 @@
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
-                  cp ${treeSitter23Headers}/include/tree_sitter/parser.h src/tree_sitter/parser.h
+                  cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
                 '';
               });
 
-              # Embedded Template (Modern Headers)
+              # Embedded Template (Modern Headers - Copy ALL headers)
               tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
@@ -96,7 +95,7 @@
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
-                  cp ${treeSitter23Headers}/include/tree_sitter/parser.h src/tree_sitter/parser.h
+                  cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
                 '';
               });
 
@@ -108,11 +107,9 @@
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 
-                # 1. Inject Legacy Headers (0.22)
-                # 2. Add Absolute Path to local 'src' for schema.core.c
                 preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
-                  cp ${treeSitter22Headers}/include/tree_sitter/parser.h src/tree_sitter/parser.h
+                  cp ${treeSitter22Headers}/include/tree_sitter/*.h src/tree_sitter/
                   export CFLAGS="-I${treeSitter22Headers}/include -I$(pwd)/src $CFLAGS"
                 '';
               });
