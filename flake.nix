@@ -20,9 +20,9 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
-          # --- Header Management ---
+          # --- Header Management (Linux Only) ---
 
-          # v0.23.0 (Modern)
+          # v0.23.0 (Modern): For tree-sitter-c-sharp
           treeSitter23Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
@@ -33,7 +33,7 @@
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
-          # v0.22.6 (Legacy)
+          # v0.22.6 (Legacy): For tree-sitter-yaml
           treeSitter22Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.22.6.tar.gz";
             hash = "sha256-jBCKgDlvXwA7Z4GDBJ+aZc52zC+om30DtsZJuHado1s=";
@@ -71,10 +71,10 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-              # --- FIX: Tree Sitter Builds ---
+              # --- FIX: Tree Sitter Builds (Linux Only) ---
+              # macOS uses wheels, so we MUST skip these overrides there.
               
-              # C# (Modern Headers - Copy ALL headers)
-              tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
+              tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
@@ -84,10 +84,9 @@
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
                 '';
-              });
+              }) else prev.tree-sitter-c-sharp;
 
-              # Embedded Template (Modern Headers - Copy ALL headers)
-              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
+              tree-sitter-embedded-template = if pkgs.stdenv.isLinux then prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
@@ -97,22 +96,26 @@
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
                 '';
-              });
+              }) else prev.tree-sitter-embedded-template;
 
-              # YAML (Legacy Headers + Local Source)
-              tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
+              tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 
+                # 1. Inject Legacy Headers (0.22)
+                # 2. Add Absolute Path to local 'src' for schema.core.c
+                # 3. Patch parser.c to rename .abi_version -> .version
                 preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
                   cp ${treeSitter22Headers}/include/tree_sitter/*.h src/tree_sitter/
+                  
                   export CFLAGS="-I${treeSitter22Headers}/include -I$(pwd)/src $CFLAGS"
+                  sed -i 's/\.abi_version =/.version =/' src/parser.c
                 '';
-              });
+              }) else prev.tree-sitter-yaml;
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
               
