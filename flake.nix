@@ -176,6 +176,16 @@
                 '';
               });
 
+              # Fix urllib3 metadata error
+              urllib3 = prev.urllib3.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.hatchling ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/license-files/d' pyproject.toml
+                  fi
+                '';
+              });
+
               # Fix tree-sitter-language-pack metadata
               tree-sitter-language-pack = prev.tree-sitter-language-pack.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
