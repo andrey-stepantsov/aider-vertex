@@ -20,11 +20,21 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
-          # Fetch Tree-Sitter 0.23.0 Source for Headers (Fixes parser.h error)
-          treeSitter023 = pkgs.fetchzip {
+          # 1. Fetch Source
+          treeSitterSrc = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
           };
+
+          # 2. Create a "Corrected" Header Directory
+          # Moves lib/src/parser.h -> include/tree_sitter/parser.h
+          treeSitterHeaders = pkgs.runCommand "tree-sitter-headers-0.23.0" { src = treeSitterSrc; } ''
+            mkdir -p $out/include/tree_sitter
+            # Copy public API headers (api.h)
+            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
+            # Copy internal headers (parser.h) which are needed by generated code
+            cp $src/lib/src/*.h $out/include/tree_sitter/
+          '';
 
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
@@ -54,18 +64,18 @@
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
               # --- FIX: Tree Sitter (Header Compatibility) ---
-              # We provide tree-sitter 0.23.0 headers explicitly via CFLAGS
+              # We use the manually rearranged headers so '#include "tree_sitter/parser.h"' works.
               
               tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
-                preferWheel = true; # Try wheel first
+                preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 
-                # Point compiler to the manually fetched 0.23.0 headers
+                # Inject the custom header path
                 preBuild = (old.preBuild or "") + ''
-                  export CFLAGS="-I${treeSitter023}/lib/include -I${treeSitter023}/lib/src $CFLAGS"
+                  export CFLAGS="-I${treeSitterHeaders}/include $CFLAGS"
                 '';
               });
 
@@ -76,9 +86,9 @@
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                 
-                # Point compiler to the manually fetched 0.23.0 headers
+                # Inject the custom header path
                 preBuild = (old.preBuild or "") + ''
-                  export CFLAGS="-I${treeSitter023}/lib/include -I${treeSitter023}/lib/src $CFLAGS"
+                  export CFLAGS="-I${treeSitterHeaders}/include $CFLAGS"
                 '';
               });
 
@@ -299,7 +309,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! PLACEHOLDER 2: Run build, copy 'got: sha256-...' hash, and paste here.
+                    # !!! PLACEHOLDER: Run build, copy 'got: sha256-...' hash, and paste here.
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
