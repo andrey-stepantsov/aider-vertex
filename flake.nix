@@ -70,9 +70,16 @@
                 '';
               });
 
-              # NEW: Fix tree-sitter-language-pack missing setuptools
+              # NEW: Fix tree-sitter-language-pack missing setuptools AND metadata error
               tree-sitter-language-pack = prev.tree-sitter-language-pack.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    # Fix invalid license string format
+                    sed -i '/license = /d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
+                  fi
+                '';
               });
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
