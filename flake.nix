@@ -31,6 +31,8 @@
             cp $src/lib/src/*.h $out/include/tree_sitter/
           '';
 
+          # Fixes packages that use 'license = "String"' instead of 'license = { text = "String" }'
+          # which breaks modern flit_core builds.
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -48,7 +50,7 @@
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
-              # --- Google Cloud Fixes ---
+              # --- Google Cloud & Metadata Fixes ---
               google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
               google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
               google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -57,6 +59,9 @@
               google-crc32c = prev.google-crc32c.overridePythonAttrs googleFix;
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
+              
+              # NEW: Fix typing-extensions metadata error
+              typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
               
@@ -91,7 +96,6 @@
                    owner = "tree-sitter-grammars";
                    repo = "tree-sitter-yaml";
                    rev = "master"; 
-                   # FIXED HASH:
                    hash = "sha256-BX6TOfAZLW+0h2TNsgsLC9K2lfirraCWlBN2vCKiXQ4=";
                 };
                 preBuild = "";
