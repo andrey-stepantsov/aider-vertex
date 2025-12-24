@@ -91,8 +91,10 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
+                
+                # YAML needs headers AND its own local src directory included
                 preBuild = (old.preBuild or "") + ''
-                  export CFLAGS="-I${treeSitterHeaders}/include $CFLAGS"
+                  export CFLAGS="-I${treeSitterHeaders}/include -Isrc $CFLAGS"
                 '';
               });
 
