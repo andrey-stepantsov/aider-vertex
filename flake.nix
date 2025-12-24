@@ -85,16 +85,14 @@
               }) else prev.tree-sitter-embedded-template;
 
               # CRITICAL FIX: Upgrade tree-sitter-yaml source via GitHub
-              # Fetching 'master' to ensure we get the latest C code compatible with GCC 14
               tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 version = "0.7.1-git-latest";
                 src = pkgs.fetchFromGitHub {
                    owner = "tree-sitter-grammars";
                    repo = "tree-sitter-yaml";
-                   # This is the latest commit as of late 2024, generally safer than PyPI for strict compilation
                    rev = "master"; 
-                   # !!! REPLACE THIS HASH AFTER FIRST RUN FAIL !!!
-                   hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                   # FIXED HASH:
+                   hash = "sha256-BX6TOfAZLW+0h2TNsgsLC9K2lfirraCWlBN2vCKiXQ4=";
                 };
                 preBuild = "";
                 preferWheel = true;
@@ -321,7 +319,7 @@
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    # !!! REPLACE THIS HASH AFTER SECOND RUN FAIL !!!
+                    # !!! EXPECT FAILURE HERE NEXT !!!
                     hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
                   };
                 }
