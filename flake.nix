@@ -59,6 +59,9 @@
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
+              
+              # NEW: Fix Pillow metadata error
+              pillow = prev.pillow.overridePythonAttrs googleFix;
 
               # Fix typing-inspection missing build backend & strict metadata error
               typing-inspection = prev.typing-inspection.overridePythonAttrs (old: {
@@ -70,7 +73,7 @@
                 '';
               });
 
-              # NEW: Fix tree-sitter-language-pack missing setuptools AND metadata error
+              # Fix tree-sitter-language-pack missing setuptools AND metadata error
               tree-sitter-language-pack = prev.tree-sitter-language-pack.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
                 postPatch = (old.postPatch or "") + ''
