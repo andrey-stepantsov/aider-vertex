@@ -37,6 +37,7 @@
               if [ -f pyproject.toml ]; then
                 sed -i '/license = /d' pyproject.toml
                 sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
+                sed -i '/license-files/d' pyproject.toml
               fi
             '';
           };
@@ -57,7 +58,21 @@
               google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
               google-crc32c = prev.google-crc32c.overridePythonAttrs googleFix;
               google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
+              
+              # NEW: Fix google-cloud-bigquery metadata error
               google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
+              
+              # NEW: Pre-emptively fix posthog (likely similar issues)
+              posthog = prev.posthog.overridePythonAttrs (old: {
+                postPatch = (old.postPatch or "") + ''
+                   if [ -f pyproject.toml ]; then
+                    sed -i '/license-files/d' pyproject.toml
+                    sed -i '/license = /d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "MIT"}' pyproject.toml
+                  fi
+                '';
+              });
+
               typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
               
               # Fix anyio metadata error
@@ -188,7 +203,7 @@
                 '';
               });
 
-              # NEW: Fix zipp metadata error
+              # Fix zipp metadata error
               zipp = prev.zipp.overridePythonAttrs (old: {
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools-scm ];
                 postPatch = (old.postPatch or "") + ''
