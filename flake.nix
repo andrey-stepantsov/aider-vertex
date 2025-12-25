@@ -305,7 +305,7 @@
                     dist = "cp311";
                     python = "cp311";
                     abi = "cp311";
-                    platform = "macosx_12_0_arm64"; # Try macOS 12+ wheel
+                    platform = "macosx_11_0_arm64"; # Corrected to 11_0
                     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Placeholder
                   };
                 };
@@ -689,7 +689,7 @@
                     dist = "cp311";
                     python = "cp311";
                     abi = "cp311";
-                    platform = "macosx_12_0_arm64"; # Try macOS 12+ wheel
+                    platform = "macosx_11_0_arm64"; # Corrected to 11_0
                     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Placeholder
                   };
                 };
