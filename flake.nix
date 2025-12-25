@@ -272,7 +272,19 @@
                   name = "${old.pname}-${old.version}";
                   hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                 };
-              }) else prev.tiktoken;
+              }) else pkgs.python311Packages.buildPythonPackage rec {
+                pname = "tiktoken";
+                version = "0.10.0";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  inherit pname version format;
+                  dist = "cp311";
+                  python = "cp311";
+                  abi = "cp311";
+                  platform = "macosx_11_0_arm64";
+                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                };
+              };
 
               # --- FIX: Tree Sitter Builds (Linux Only) ---
               tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
@@ -550,11 +562,23 @@
                 '';
               });
 
-              shapely = prev.shapely.overridePythonAttrs (old: {
+              shapely = if pkgs.stdenv.isLinux then prev.shapely.overridePythonAttrs (old: {
                 preBuild = ''
                   export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
                 '';
-              });
+              }) else pkgs.python311Packages.buildPythonPackage rec {
+                pname = "shapely";
+                version = prev.shapely.version;
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  inherit pname version format;
+                  dist = "cp311";
+                  python = "cp311";
+                  abi = "cp311";
+                  platform = "macosx_11_0_arm64";
+                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                };
+              };
 
               # --- FIX: Hybrid Build Strategy (Rust Packages) ---
               rpds-py = if pkgs.stdenv.isLinux then 
