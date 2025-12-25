@@ -530,7 +530,7 @@
                     abi = "cp311";
                     platform = "macosx_12_0_arm64"; # SciPy often targets macOS 12+ on ARM
                     # Placeholder hash to be filled in by user
-                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                    hash = "sha256-NHFuKB8YGgI0Hd6q1YQgW9L9PCQgY700I9YawlnKfro=";
                   };
                 };
 
