@@ -311,7 +311,7 @@
                 '';
               });
 
-              # FIX: Use Source for tree-sitter-yaml on Linux
+              # FIX: Use Source for tree-sitter-yaml on Linux, Force Wheel on macOS
               tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 version = "0.7.1-git-latest";
                 preferWheel = false;
@@ -326,12 +326,20 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-              }) else prev.tree-sitter-yaml.overridePythonAttrs (old: {
-                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
-                  pkgs.python311Packages.setuptools 
-                  pkgs.python311Packages.wheel
-                ];
-              });
+              }) else pkgs.python311Packages.buildPythonPackage rec {
+                pname = "tree-sitter-yaml";
+                version = "0.7.1";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  pname = "tree_sitter_yaml";
+                  inherit version format;
+                  dist = "cp311";
+                  python = "cp311";
+                  abi = "cp311";
+                  platform = "macosx_11_0_arm64";
+                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                };
+              };
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
               aiohappyeyeballs = pkgs.python311Packages.buildPythonPackage rec {
