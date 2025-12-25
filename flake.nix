@@ -306,7 +306,7 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "macosx_11_0_arm64"; # Corrected to 11_0
-                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Placeholder
+                    hash = "sha256-9kHQc1BZtIJSxECdZUa2pi7etMTkgwZJnbEbvkA7hy8=";
                   };
                 };
 
