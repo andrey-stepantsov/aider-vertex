@@ -562,52 +562,6 @@
                     };
                   };
 
-                regex = if pkgs.stdenv.isLinux then
-                  pkgs.python311Packages.buildPythonPackage rec {
-                    pname = "regex";
-                    version = "2024.11.6";
-                    format = "pyproject";
-                    src = pkgs.fetchPypi {
-                      inherit pname version;
-                      hash = "sha256-erFZsGPFKgMzyITkZ5+NeoURLuMHj+PZAEst2HVYVRk=";
-                    };
-                    postPatch = ''
-                      if [ -f pyproject.toml ]; then
-                        sed -i '/license = /d' pyproject.toml
-                        sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
-                      fi
-                    '';
-                    nativeBuildInputs = [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
-                  }
-                else prev.regex.overridePythonAttrs (old: { 
-                  preferWheel = true; 
-                  postPatch = (old.postPatch or "") + ''
-                    if [ -f pyproject.toml ]; then
-                      sed -i '/license = /d' pyproject.toml
-                      sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
-                      sed -i '/license-files/d' pyproject.toml
-                    fi
-                  '';
-                });
-
-                shapely = if pkgs.stdenv.isLinux then prev.shapely.overridePythonAttrs (old: {
-                  preBuild = ''
-                    export LD_LIBRARY_PATH=${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH
-                  '';
-                }) else pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "shapely";
-                  version = prev.shapely.version;
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "cp311";
-                    python = "cp311";
-                    abi = "cp311";
-                    platform = "macosx_11_0_arm64";
-                    hash = "sha256-FqnHIrp3TPULXUVBJCtMzgWq/USgFSkMgrqKFpMf9j0=";
-                  };
-                };
-
                 # --- FIX: Hybrid Build Strategy (Rust Packages) ---
                 rpds-py = if pkgs.stdenv.isLinux then 
                   pkgs.python311Packages.buildPythonPackage rec {
@@ -687,10 +641,10 @@
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
-                    dist = "cp311";
-                    python = "cp311";
-                    abi = "cp311";
-                    platform = "macosx_12_0_arm64"; # Try macOS 12+ wheel
+                    dist = "cp37"; # Try cp37 abi3 wheel
+                    python = "cp37";
+                    abi = "abi3";
+                    platform = "macosx_11_0_arm64";
                     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Placeholder
                   };
                 };
