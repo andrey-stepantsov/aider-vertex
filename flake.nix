@@ -63,10 +63,18 @@
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             overrides = [
-              # 1. Filtered Defaults: Remove broken overrides that crash on evaluation
-              (final: prev: builtins.removeAttrs (p2n.defaultPoetryOverrides final prev) [ "watchfiles" "rpds-py" ])
+              # 1. Spoof versions to bypass poetry2nix default overrides crash
+              # We set versions to ones that poetry2nix likely knows about, so it doesn't crash looking up hashes.
+              # Our manual overrides (step 3) will overwrite these packages anyway.
+              (final: prev: {
+                watchfiles = prev.watchfiles.overridePythonAttrs (old: { version = "0.19.0"; });
+                rpds-py = prev.rpds-py.overridePythonAttrs (old: { version = "0.18.0"; }); 
+              })
 
-              # 2. My Manual Overrides
+              # 2. The Defaults (now safe because they see "known" versions)
+              p2n.defaultPoetryOverrides
+
+              # 3. My Manual Overrides (restoring sanity and correct versions)
               (final: prev: {
                 # --- Google Cloud & Metadata Fixes ---
                 google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
