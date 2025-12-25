@@ -21,9 +21,11 @@
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
           # --- Header Management ---
-          # Use the source from nixpkgs' tree-sitter to avoid managing hashes manually
-          # This assumes nixpkgs 24.11 has a recent enough tree-sitter (v0.24+)
-          treeSitter24Src = pkgs.tree-sitter.src;
+          # Explicitly fetch Tree-sitter 0.24.3 source
+          treeSitter24Src = pkgs.fetchzip {
+            url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.24.3.tar.gz";
+            hash = "sha256-0000000000000000000000000000000000000000000000000000";
+          };
           treeSitter24Headers = pkgs.runCommand "tree-sitter-headers-0.24" { src = treeSitter24Src; } ''
             mkdir -p $out/include/tree_sitter
             cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
@@ -688,25 +690,16 @@
                     propagatedBuildInputs = [ final.anyio ];
                   };
 
-                # FIX: Force wheel for tokenizers on macOS to avoid Rust compilation
-                tokenizers = if pkgs.stdenv.isLinux then prev.tokenizers.overridePythonAttrs (old: {
+                # FIX: Build tokenizers from source on ALL platforms to avoid wheel issues
+                tokenizers = prev.tokenizers.overridePythonAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.rustPlatform.maturinBuildHook 
                     pkgs.python311Packages.maturin
                   ];
-                }) else pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "tokenizers";
-                  version = "0.21.4";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "cp37"; # Try cp37 abi3 wheel
-                    python = "cp37";
-                    abi = "abi3";
-                    platform = "macosx_11_0_arm64";
-                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Placeholder
-                  };
-                };
+                  buildInputs = (old.buildInputs or []) ++ (pkgs.lib.optionals pkgs.stdenv.isDarwin [
+                    pkgs.libiconv
+                  ]);
+                });
               })
             ];
 
