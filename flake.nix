@@ -311,8 +311,8 @@
                 '';
               });
 
-              # FIX: Use Source for tree-sitter-yaml on ALL platforms with headers
-              tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
+              # FIX: Use Source for tree-sitter-yaml on Linux, Force Wheel on macOS
+              tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 version = "0.7.1-git-latest";
                 preferWheel = false;
                 src = pkgs.fetchFromGitHub {
@@ -321,6 +321,7 @@
                    rev = "master"; 
                    hash = "sha256-BX6TOfAZLW+0h2TNsgsLC9K2lfirraCWlBN2vCKiXQ4=";
                 };
+                preBuild = "";
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
@@ -329,7 +330,20 @@
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
                 '';
-              });
+              }) else pkgs.python311Packages.buildPythonPackage rec {
+                pname = "tree-sitter-yaml";
+                version = "0.7.1";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  pname = "tree_sitter_yaml";
+                  inherit version format;
+                  dist = "cp311";
+                  python = "cp311";
+                  abi = "cp311";
+                  platform = "macosx_11_0_arm64";
+                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                };
+              };
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
               aiohappyeyeballs = pkgs.python311Packages.buildPythonPackage rec {
