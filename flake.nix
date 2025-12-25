@@ -295,6 +295,7 @@
                   platform = "macosx_11_0_arm64";
                   hash = "sha256-9kHQc1BZtIJSxECdZUa2pi7etMTkgwZJnbEbvkA7hy8=";
                 };
+                propagatedBuildInputs = [ final.regex final.requests ];
               };
 
               # --- FIX: Tree Sitter Builds ---
@@ -637,7 +638,7 @@
                     hash = "sha256-aT7X7HLL/O45npLIlTYrbmbWPaxrkeLBGuA9ENUD5XU=";
                   };
                   nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
-                  propagatedBuildInputs = [ pkgs.python311Packages.anyio ];
+                  propagatedBuildInputs = [ final.anyio ];
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
@@ -658,7 +659,7 @@
                     platform = "macosx_11_0_arm64"; # Specific to aarch64-darwin
                     hash = "sha256-Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z="; # Placeholder
                   };
-                  propagatedBuildInputs = [ pkgs.python311Packages.anyio ];
+                  propagatedBuildInputs = [ final.anyio ];
                 };
 
               # Pre-emptively Fix tokenizers (often needs maturin)
