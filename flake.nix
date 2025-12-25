@@ -662,13 +662,25 @@
                   propagatedBuildInputs = [ final.anyio ];
                 };
 
-              # Pre-emptively Fix tokenizers (often needs maturin)
-              tokenizers = prev.tokenizers.overridePythonAttrs (old: {
+              # FIX: Force wheel for tokenizers on macOS to avoid Rust compilation
+              tokenizers = if pkgs.stdenv.isLinux then prev.tokenizers.overridePythonAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.rustPlatform.maturinBuildHook 
                     pkgs.maturin
                   ];
-              });
+              }) else pkgs.python311Packages.buildPythonPackage rec {
+                pname = "tokenizers";
+                version = "0.21.4";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  inherit pname version format;
+                  dist = "cp311";
+                  python = "cp311";
+                  abi = "cp311";
+                  platform = "macosx_11_0_arm64";
+                  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Placeholder
+                };
+              };
             });
 
             postFixup = ''
