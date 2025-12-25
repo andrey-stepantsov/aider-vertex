@@ -293,10 +293,10 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                preBuild = (old.preBuild or "") + ''
+                preBuild = (old.preBuild or "") + (pkgs.lib.optionalString pkgs.stdenv.isLinux ''
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
-                '';
+                '');
               });
 
               tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
@@ -305,10 +305,10 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                preBuild = (old.preBuild or "") + ''
+                preBuild = (old.preBuild or "") + (pkgs.lib.optionalString pkgs.stdenv.isLinux ''
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
-                '';
+                '');
               });
 
               # FIX: Use Source for tree-sitter-yaml on Linux
@@ -326,7 +326,12 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-              }) else prev.tree-sitter-yaml;
+              }) else prev.tree-sitter-yaml.overridePythonAttrs (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                  pkgs.python311Packages.setuptools 
+                  pkgs.python311Packages.wheel
+                ];
+              });
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
               aiohappyeyeballs = pkgs.python311Packages.buildPythonPackage rec {
