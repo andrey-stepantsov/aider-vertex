@@ -286,30 +286,30 @@
                 };
               };
 
-              # --- FIX: Tree Sitter Builds (Linux Only) ---
-              tree-sitter-c-sharp = if pkgs.stdenv.isLinux then prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
+              # --- FIX: Tree Sitter Builds ---
+              tree-sitter-c-sharp = prev.tree-sitter-c-sharp.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                preBuild = (old.preBuild or "") + ''
+                preBuild = (old.preBuild or "") + (pkgs.lib.optionalString pkgs.stdenv.isLinux ''
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
-                '';
-              }) else prev.tree-sitter-c-sharp;
+                '');
+              });
 
-              tree-sitter-embedded-template = if pkgs.stdenv.isLinux then prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
+              tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
                 preferWheel = true;
                 nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                preBuild = (old.preBuild or "") + ''
+                preBuild = (old.preBuild or "") + (pkgs.lib.optionalString pkgs.stdenv.isLinux ''
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
-                '';
-              }) else prev.tree-sitter-embedded-template;
+                '');
+              });
 
               # FIX: Use Source for tree-sitter-yaml on Linux
               tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
