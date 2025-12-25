@@ -34,7 +34,7 @@
           # Add 0.22 headers for older grammars (fixes TSMapSlice error)
           treeSitter22Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.22.6.tar.gz";
-            hash = "sha256-S79+e+sWqQvFq0W8qJq1+sWqQvFq0W8qJq1+sWqQvFq0="; # Invalid hash to force mismatch
+            hash = "sha256-0000000000000000000000000000000000000000000000000000"; # Placeholder - EXPECT FAILURE
           };
           treeSitter22Headers = pkgs.runCommand "tree-sitter-headers-0.22" { src = treeSitter22Src; } ''
             mkdir -p $out/include/tree_sitter
