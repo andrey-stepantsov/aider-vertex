@@ -308,6 +308,7 @@
                     platform = "macosx_11_0_arm64"; # Corrected to 11_0
                     hash = "sha256-9kHQc1BZtIJSxECdZUa2pi7etMTkgwZJnbEbvkA7hy8=";
                   };
+                  propagatedBuildInputs = [ final.regex final.requests ];
                 };
 
                 # --- FIX: Tree Sitter Builds ---
@@ -689,7 +690,7 @@
                     dist = "cp311";
                     python = "cp311";
                     abi = "cp311";
-                    platform = "macosx_11_0_arm64"; # Corrected to 11_0
+                    platform = "macosx_12_0_arm64"; # Try macOS 12+ wheel
                     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Placeholder
                   };
                 };
