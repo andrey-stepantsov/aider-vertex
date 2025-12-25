@@ -688,16 +688,25 @@
                     propagatedBuildInputs = [ final.anyio ];
                   };
 
-                # FIX: Build tokenizers from source on ALL platforms to avoid wheel issues
-                tokenizers = prev.tokenizers.overridePythonAttrs (old: {
+                # FIX: Build tokenizers from source on Linux, Force Wheel on Darwin
+                tokenizers = if pkgs.stdenv.isLinux then prev.tokenizers.overridePythonAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.rustPlatform.maturinBuildHook 
                     pkgs.python311Packages.maturin
                   ];
-                  buildInputs = (old.buildInputs or []) ++ (pkgs.lib.optionals pkgs.stdenv.isDarwin [
-                    pkgs.libiconv
-                  ]);
-                });
+                }) else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "tokenizers";
+                  version = prev.tokenizers.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
               })
             ];
 
