@@ -674,7 +674,7 @@
                 format = "wheel";
                 src = pkgs.fetchPypi {
                   inherit pname version format;
-                  dist = "cp311";
+                  dist = "py3"; # Try py3 directory
                   python = "cp311";
                   abi = "cp311";
                   platform = "macosx_11_0_arm64";
