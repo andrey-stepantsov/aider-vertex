@@ -20,7 +20,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
-          # --- Header Management (Linux Only) ---
+          # --- Header Management ---
           treeSitter23Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
@@ -293,10 +293,10 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                preBuild = (old.preBuild or "") + (pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+                preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
-                '');
+                '';
               });
 
               tree-sitter-embedded-template = prev.tree-sitter-embedded-template.overridePythonAttrs (old: {
@@ -305,10 +305,10 @@
                   pkgs.python311Packages.setuptools 
                   pkgs.python311Packages.wheel
                 ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
-                preBuild = (old.preBuild or "") + (pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+                preBuild = (old.preBuild or "") + ''
                   mkdir -p src/tree_sitter
                   cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
-                '');
+                '';
               });
 
               # FIX: Use Source for tree-sitter-yaml on Linux
