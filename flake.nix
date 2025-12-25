@@ -703,7 +703,7 @@
                     dist = "cp311";
                     python = "cp311";
                     abi = "cp311";
-                    platform = "macosx_11_0_arm64";
+                    platform = "macosx_12_0_arm64";
                     hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
                 };
