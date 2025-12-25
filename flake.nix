@@ -696,14 +696,14 @@
                   ];
                 }) else pkgs.python311Packages.buildPythonPackage rec {
                   pname = "tokenizers";
-                  version = prev.tokenizers.version;
+                  version = "0.19.1"; # Corrected to a version available on PyPI
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
                     dist = "cp311";
                     python = "cp311";
                     abi = "cp311";
-                    platform = "macosx_12_0_arm64";
+                    platform = "macosx_11_0_arm64"; # Platform for version 0.19.1
                     hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
                 };
