@@ -21,6 +21,16 @@
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
           # --- Header Management ---
+          treeSitter24Src = pkgs.fetchzip {
+            url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.24.3.tar.gz";
+            hash = "sha256-0000000000000000000000000000000000000000000000000000";
+          };
+          treeSitter24Headers = pkgs.runCommand "tree-sitter-headers-0.24" { src = treeSitter24Src; } ''
+            mkdir -p $out/include/tree_sitter
+            cp $src/lib/include/tree_sitter/*.h $out/include/tree_sitter/
+            cp $src/lib/src/*.h $out/include/tree_sitter/
+          '';
+
           treeSitter23Src = pkgs.fetchzip {
             url = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.23.0.tar.gz";
             hash = "sha256-QNi2u6/jtiMo1dLYoA8Ev1OvZfa8mXCMibSD70J4vVI=";
@@ -352,7 +362,7 @@
                   ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                   preBuild = (old.preBuild or "") + ''
                     mkdir -p src/tree_sitter
-                    cp ${treeSitter23Headers}/include/tree_sitter/*.h src/tree_sitter/
+                    cp ${treeSitter24Headers}/include/tree_sitter/*.h src/tree_sitter/
                   '';
                 });
 
