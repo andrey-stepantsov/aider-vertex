@@ -48,7 +48,7 @@
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
-            preferWheels = true; # GLOBAL PREFERENCE FOR WHEELS
+            preferWheels = false; 
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             overrides = p2n.defaultPoetryOverrides.extend (final: prev: {
@@ -302,7 +302,7 @@
               # FIX: Use Source for tree-sitter-yaml on Linux
               tree-sitter-yaml = if pkgs.stdenv.isLinux then prev.tree-sitter-yaml.overridePythonAttrs (old: {
                 version = "0.7.1-git-latest";
-                preferWheel = false; # Explicitly disable wheel preference for this override
+                preferWheel = false;
                 src = pkgs.fetchFromGitHub {
                    owner = "tree-sitter-grammars";
                    repo = "tree-sitter-yaml";
@@ -317,48 +317,67 @@
               }) else prev.tree-sitter-yaml;
 
               # --- FIX: Linux Build Backend & Metadata Issues ---
-              aiohappyeyeballs = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "aiohappyeyeballs";
-                  version = "2.6.1";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "py3";
-                    python = "py3";
-                    hash = "sha256-80m6j0t1yyXJnFwthOmX5IUgTSkCqVl4ArA3HwkzH7g=";
-                  };
-                }
-              else prev.aiohappyeyeballs.overridePythonAttrs (old: { preferWheel = true; });
+              aiohappyeyeballs = pkgs.python311Packages.buildPythonPackage rec {
+                pname = "aiohappyeyeballs";
+                version = "2.6.1";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  inherit pname version format;
+                  dist = "py3";
+                  python = "py3";
+                  hash = "sha256-80m6j0t1yyXJnFwthOmX5IUgTSkCqVl4ArA3HwkzH7g=";
+                };
+              };
 
-              click = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "click";
-                  version = "8.2.1";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "py3";
-                    python = "py3";
-                    hash = "sha256-YaMmW5FOhQuFMX0LMQnH+M01pnD5Y4ZgBdbvHVF1oSs=";
-                  };
-                }
-              else prev.click.overridePythonAttrs (old: { preferWheel = true; });
+              click = pkgs.python311Packages.buildPythonPackage rec {
+                pname = "click";
+                version = "8.2.1";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  inherit pname version format;
+                  dist = "py3";
+                  python = "py3";
+                  hash = "sha256-YaMmW5FOhQuFMX0LMQnH+M01pnD5Y4ZgBdbvHVF1oSs=";
+                };
+              };
 
-              docstring-parser = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "docstring_parser";
-                  version = "0.17.0";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "py3";
-                    python = "py3";
-                    hash = "sha256-zyVpq9I9zoCZswD5tPqBkelYLdpzH9Uz2vVMRVFlhwg=";
-                  };
-                }
-              else prev.docstring-parser.overridePythonAttrs (old: { preferWheel = true; });
+              docstring-parser = pkgs.python311Packages.buildPythonPackage rec {
+                pname = "docstring_parser";
+                version = "0.17.0";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  inherit pname version format;
+                  dist = "py3";
+                  python = "py3";
+                  hash = "sha256-zyVpq9I9zoCZswD5tPqBkelYLdpzH9Uz2vVMRVFlhwg=";
+                };
+              };
 
+              mslex = pkgs.python311Packages.buildPythonPackage rec {
+                pname = "mslex";
+                version = "1.3.0";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  inherit pname version format;
+                  dist = "py3";
+                  python = "py3";
+                  hash = "sha256-xwdLNHIBs0ZvwHfFaS+86bX2KmOlH1N6U/u9Au/y7qQ=";
+                };
+              };
+
+              oslex = pkgs.python311Packages.buildPythonPackage rec {
+                pname = "oslex";
+                version = "0.1.3";
+                format = "wheel";
+                src = pkgs.fetchPypi {
+                  inherit pname version format;
+                  dist = "py3";
+                  python = "py3";
+                  hash = "sha256-cay4odQu143dITodOmKLv4N/dYvSmZyR33zleXJGa98=";
+                };
+              };
+
+              # --- Platform Specific or C-Extension Packages ---
               grpcio = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "grpcio";
@@ -377,6 +396,7 @@
                 }
               else prev.grpcio.overridePythonAttrs (old: { preferWheel = true; });
 
+              # FIX: Force wheel on Darwin for hf-xet
               hf-xet = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "hf_xet";
@@ -391,8 +411,22 @@
                     hash = "sha256-bvqvGlqfw6UB0+ceiKa/68ae46cW0OcTqTHIuNkgA48=";
                   };
                 }
-              else prev.hf-xet.overridePythonAttrs (old: { preferWheel = true; });
+              else 
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "hf_xet";
+                  version = "1.1.7";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp37";
+                    python = "cp37";
+                    abi = "abi3";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-sQn0wR4BwFf8ggBMnlHmzf4ssjBjdkSt5AxZlzkGey4=";
+                  };
+                };
 
+              # FIX: Force wheel on Darwin for jiter
               jiter = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "jiter";
@@ -407,36 +441,22 @@
                     hash = "sha256-TEQOoAOtEJJ6MFIakGLOELVHlZLopw2ifyHutFe0qcU=";
                   };
                 }
-              else prev.jiter.overridePythonAttrs (old: { preferWheel = true; });
-
-              mslex = if pkgs.stdenv.isLinux then
+              else 
                 pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "mslex";
-                  version = "1.3.0";
+                  pname = "jiter";
+                  version = "0.10.0";
                   format = "wheel";
                   src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "py3";
-                    python = "py3";
-                    hash = "sha256-xwdLNHIBs0ZvwHfFaS+86bX2KmOlH1N6U/u9Au/y7qQ=";
+                     inherit pname version format;
+                     dist = "cp311";
+                     python = "cp311";
+                     abi = "cp311";
+                     platform = "macosx_11_0_arm64";
+                     hash = "sha256-VYzH5E/Y5QeiNr7moC+hcZm6dSh0QAoMps1uIZbNt9w=";
                   };
-                }
-              else prev.mslex.overridePythonAttrs (old: { preferWheel = true; });
+                };
 
-              oslex = if pkgs.stdenv.isLinux then
-                pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "oslex";
-                  version = "0.1.3";
-                  format = "wheel";
-                  src = pkgs.fetchPypi {
-                    inherit pname version format;
-                    dist = "py3";
-                    python = "py3";
-                    hash = "sha256-cay4odQu143dITodOmKLv4N/dYvSmZyR33zleXJGa98=";
-                  };
-                }
-              else prev.oslex.overridePythonAttrs (old: { preferWheel = true; });
-
+              # FIX: Force wheel on Darwin for numpy to avoid compilation
               numpy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "numpy";
@@ -454,8 +474,22 @@
                   buildInputs = [ pkgs.gfortran.cc.lib pkgs.zlib ];
                   passthru = { blas = pkgs.openblas; };
                 }
-              else prev.numpy.overridePythonAttrs (old: { preferWheel = true; });
+              else 
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "numpy";
+                  version = "1.26.4";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-7di1/kfasJEXbSG7beVorN2QbRiHpFhKFampah3KBu8=";
+                  };
+                };
 
+              # FIX: Force wheel on Darwin for scipy to avoid compilation
               scipy = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "scipy";
@@ -472,7 +506,21 @@
                   nativeBuildInputs = [ pkgs.autoPatchelfHook ];
                   buildInputs = [ pkgs.gfortran.cc.lib pkgs.zlib ];
                 }
-              else prev.scipy.overridePythonAttrs (old: { preferWheel = true; });
+              else 
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "scipy";
+                  version = "1.15.3"; 
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_12_0_arm64"; # SciPy often targets macOS 12+ on ARM
+                    # Placeholder hash to be filled in by user
+                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+                  };
+                };
 
               regex = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
@@ -491,7 +539,16 @@
                   '';
                   nativeBuildInputs = [ pkgs.python311Packages.setuptools pkgs.python311Packages.wheel ];
                 }
-              else prev.regex.overridePythonAttrs (old: { preferWheel = true; });
+              else prev.regex.overridePythonAttrs (old: { 
+                preferWheel = true; 
+                postPatch = (old.postPatch or "") + ''
+                  if [ -f pyproject.toml ]; then
+                    sed -i '/license = /d' pyproject.toml
+                    sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
+                    sed -i '/license-files/d' pyproject.toml
+                  fi
+                '';
+              });
 
               shapely = prev.shapely.overridePythonAttrs (old: {
                 preBuild = ''
@@ -503,20 +560,34 @@
               rpds-py = if pkgs.stdenv.isLinux then 
                 pkgs.python311Packages.buildPythonPackage rec {
                   pname = "rpds_py";
-                  version = "0.22.3";
+                  version = "0.27.0"; 
                   format = "pyproject";
                   src = pkgs.fetchPypi {
                     inherit pname version;
-                    hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
+                    hash = "sha256-5+h3rB2yqJ0b9l5c9v8k1h4j2l5+3f4g6h8j9k0l1m2n3o="; # Placeholder
                   };
                   nativeBuildInputs = with pkgs; [ rustPlatform.cargoSetupHook rustPlatform.maturinBuildHook ];
                   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
                     inherit src;
                     name = "${pname}-${version}";
-                    hash = "sha256-zpmgLLsNA3OzuaSBWoAZuA5nMg9mXWbY5qILE+7hucs=";
+                    hash = "sha256-placeholder-for-rpds="; 
                   };
                 }
-              else prev.rpds-py.overridePythonAttrs (old: { preferWheel = true; });
+              else 
+                # Pure wheel override for Darwin to bypass prev logic
+                pkgs.python311Packages.buildPythonPackage rec {
+                   pname = "rpds_py";
+                   version = "0.27.0";
+                   format = "wheel";
+                   src = pkgs.fetchPypi {
+                     inherit pname version format;
+                     dist = "cp311";
+                     python = "cp311";
+                     abi = "cp311";
+                     platform = "macosx_11_0_arm64"; # Specific to aarch64-darwin
+                     hash = "sha256-fshZlPlqWM9+0ojKo0S3/jH9HVA73xPXMx6tX3CrYNU="; # Corrected Hash
+                   };
+                };
 
               watchfiles = if pkgs.stdenv.isLinux then
                 pkgs.python311Packages.buildPythonPackage rec {
@@ -535,7 +606,30 @@
                     hash = "sha256-IoEWdK8DZrq9fPdl6b50jacuJb47rWYF+Pro/mgP67E=";
                   };
                 }
-              else prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
+              else 
+                # Pure wheel override for Darwin to bypass prev logic
+                pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "watchfiles";
+                  version = "1.1.0";
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64"; # Specific to aarch64-darwin
+                    hash = "sha256-Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z="; # Placeholder
+                  };
+                  propagatedBuildInputs = [ pkgs.python311Packages.anyio ];
+                };
+
+              # Pre-emptively Fix tokenizers (often needs maturin)
+              tokenizers = prev.tokenizers.overridePythonAttrs (old: {
+                  nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                    pkgs.rustPlatform.maturinBuildHook 
+                    pkgs.maturin
+                  ];
+              });
             });
 
             postFixup = ''
