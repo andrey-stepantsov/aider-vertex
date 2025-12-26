@@ -4,8 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     poetry2nix = {
-      # Use the specific tag 2024.11.22
-      url = "github:nix-community/poetry2nix?ref=2024.11.22";
+      url = "github:nix-community/poetry2nix/a01b0b56360812423c2d5a3977114660233b499b";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
