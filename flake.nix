@@ -307,9 +307,9 @@
                   format = "wheel";
                   src = pkgs.fetchPypi {
                     inherit pname version format;
-                    dist = "cp311";
-                    python = "cp311";
-                    abi = "cp311";
+                    dist = "cp310";
+                    python = "cp310";
+                    abi = "cp310";
                     platform = "macosx_11_0_arm64";
                     hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
