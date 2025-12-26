@@ -386,7 +386,7 @@
                   version = "0.7.1";
                   preferWheel = false;
                   src = pkgs.fetchzip {
-                    url = "https://github.com/tree-sitter/tree-sitter-yaml/archive/refs/tags/v0.7.1.tar.gz";
+                    url = "https://github.com/d-ema/tree-sitter-yaml/archive/refs/tags/v0.7.1.tar.gz";
                     # Placeholder hash to be updated
                     hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
