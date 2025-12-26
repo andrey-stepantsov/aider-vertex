@@ -4,8 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     poetry2nix = {
-      # Use the specific tag via the ref query parameter
-      url = "github:nix-community/poetry2nix?ref=2024.11.2255620";
+      url = "github:nix-community/poetry2nix/1.49.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
