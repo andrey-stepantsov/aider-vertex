@@ -385,12 +385,10 @@
                 tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
                   version = "0.7.1";
                   preferWheel = false;
-                  src = pkgs.fetchFromGitHub {
-                     owner = "tree-sitter";
-                     repo = "tree-sitter-yaml";
-                     rev = "v0.7.1";
-                     # Placeholder hash to be updated
-                     hash = "sha256-0000000000000000000000000000000000000000000=";
+                  src = pkgs.fetchzip {
+                    url = "https://github.com/tree-sitter/tree-sitter-yaml/archive/refs/tags/v0.7.1.tar.gz";
+                    # Placeholder hash to be updated
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.python311Packages.setuptools 
