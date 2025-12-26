@@ -2,9 +2,10 @@
   description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.0.3-modular)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     poetry2nix = {
-      url = "github:nix-community/poetry2nix";
+      # Use the specific tag via the ref query parameter
+      url = "github:nix-community/poetry2nix?ref=2024.11.2255620";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
