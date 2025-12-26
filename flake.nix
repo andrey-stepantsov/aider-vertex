@@ -461,6 +461,53 @@
                   };
                 };
 
+                # FIX: Force wheel on Darwin for cffi
+                cffi = if pkgs.stdenv.isLinux then prev.cffi else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "cffi";
+                  version = prev.cffi.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
+
+                # FIX: Force wheel on Darwin for cryptography
+                cryptography = if pkgs.stdenv.isLinux then prev.cryptography.overridePythonAttrs (old: {
+                  nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.rustPlatform.maturinBuildHook pkgs.python311Packages.maturin ];
+                }) else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "cryptography";
+                  version = prev.cryptography.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp39"; # Cryptography wheels are often abi3
+                    python = "cp39";
+                    abi = "abi3";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
+
+                # FIX: Force wheel on Darwin for greenlet
+                greenlet = if pkgs.stdenv.isLinux then prev.greenlet else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "greenlet";
+                  version = prev.greenlet.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
+
                 # --- Platform Specific or C-Extension Packages ---
                 grpcio = if pkgs.stdenv.isLinux then
                   pkgs.python311Packages.buildPythonPackage rec {
