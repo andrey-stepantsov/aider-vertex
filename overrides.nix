@@ -44,6 +44,10 @@ let
   # ---------------------------------------------------------------------------
   linux = if pkgs.stdenv.isLinux then {
      # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
+    watchfiles = prev.watchfiles.overridePythonAttrs (old: {
+      preferWheel = true;
+      propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
+    });
   } else {};
 
 in
