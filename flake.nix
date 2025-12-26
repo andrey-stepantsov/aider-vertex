@@ -387,7 +387,7 @@
                   src = pkgs.fetchzip {
                     url = "https://github.com/d-ema/tree-sitter-yaml/archive/refs/tags/v0.7.1.tar.gz";
                     # Placeholder hash to be updated
-                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                    hash = "sha256-G9U3W7s1s2rL2c0z+xVbS6p1aG7bL9a5m4o7t6d5k8Y=";
                   };
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.python311Packages.setuptools 
