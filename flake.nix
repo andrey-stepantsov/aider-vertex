@@ -259,7 +259,7 @@
                 });
 
                 # Pre-emptively fix multidict
-                multidict = prev.multidict.overridePythonAttrs (old: {
+                multidict = if pkgs.stdenv.isLinux then prev.multidict.overridePythonAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
                   postPatch = (old.postPatch or "") + ''
                     if [ -f pyproject.toml ]; then
@@ -267,10 +267,22 @@
                       sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
                     fi
                   '';
-                });
+                }) else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "multidict";
+                  version = prev.multidict.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
 
                 # Pre-emptively fix yarl
-                yarl = prev.yarl.overridePythonAttrs (old: {
+                yarl = if pkgs.stdenv.isLinux then prev.yarl.overridePythonAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.python311Packages.setuptools ];
                   postPatch = (old.postPatch or "") + ''
                     if [ -f pyproject.toml ]; then
@@ -278,7 +290,19 @@
                       sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
                     fi
                   '';
-                });
+                }) else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "yarl";
+                  version = prev.yarl.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
 
                 # FIX: Use Wheels for tiktoken on ALL systems
                 tiktoken = if pkgs.stdenv.isLinux then prev.tiktoken.overridePythonAttrs (old: {
@@ -704,7 +728,7 @@
                       python = "cp311";
                       abi = "cp311";
                       platform = "macosx_11_0_arm64"; # Specific to aarch64-darwin
-                      hash = "sha256-Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z="; # Placeholder
+                      hash = "sha256-0000000000000000000000000000000000000000000=";
                     };
                     propagatedBuildInputs = [ final.anyio ];
                   };
