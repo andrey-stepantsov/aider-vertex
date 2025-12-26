@@ -472,7 +472,7 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "macosx_11_0_arm64";
-                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                    hash = "sha256-MMXgy1rkk8BMi0KRblLKOAefGyNcL4rl9FJ7ljxAHK8=";
                   };
                 };
 
