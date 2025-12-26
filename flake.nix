@@ -91,7 +91,6 @@
                 google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
                 google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
                 google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
-                google-crc32c = prev.google-crc32c.overridePythonAttrs googleFix;
                 google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
                 google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
                 typing-extensions = prev.typing-extensions.overridePythonAttrs googleFix;
@@ -458,6 +457,52 @@
                     dist = "py3";
                     python = "py3";
                     hash = "sha256-cay4odQu143dITodOmKLv4N/dYvSmZyR33zleXJGa98=";
+                  };
+                };
+
+                # FIX: Force wheel on Darwin for google-crc32c
+                google-crc32c = if pkgs.stdenv.isLinux then prev.google-crc32c.overridePythonAttrs googleFix
+                else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "google-crc32c";
+                  version = prev.google-crc32c.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp39";
+                    python = "cp39";
+                    abi = "abi3";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
+
+                # FIX: Force wheel on Darwin for wrapt
+                wrapt = if pkgs.stdenv.isLinux then prev.wrapt else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "wrapt";
+                  version = prev.wrapt.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
+
+                # FIX: Force wheel on Darwin for msgpack
+                msgpack = if pkgs.stdenv.isLinux then prev.msgpack else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "msgpack";
+                  version = prev.msgpack.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
                 };
 
