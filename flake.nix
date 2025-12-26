@@ -345,7 +345,7 @@
                   '';
                 });
 
-                # FIX: Use Source for tree-sitter-yaml on ALL platforms with NEWER headers
+                # FIX: Use Source for tree-sitter-yaml on ALL platforms with OLDER headers
                 tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
                   version = "0.7.1-git-latest";
                   preferWheel = false;
@@ -361,7 +361,7 @@
                   ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                   preBuild = (old.preBuild or "") + ''
                     mkdir -p src/tree_sitter
-                    cp ${treeSitter24Headers}/include/tree_sitter/*.h src/tree_sitter/
+                    cp ${treeSitter22Headers}/include/tree_sitter/*.h src/tree_sitter/
                   '';
                 });
 
