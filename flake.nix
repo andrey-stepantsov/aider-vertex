@@ -386,7 +386,7 @@
                   ] ++ (pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]);
                   preBuild = (old.preBuild or "") + ''
                     mkdir -p src/tree_sitter
-                    cp ${treeSitter22Headers}/include/tree_sitter/*.h src/tree_sitter/
+                    cp ${treeSitter24Headers}/include/tree_sitter/*.h src/tree_sitter/
                   '';
                 });
 
