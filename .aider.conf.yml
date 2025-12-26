@@ -3,7 +3,8 @@
 #
 #
 architect: true
-model: gemini/gemini-3-pro-preview
+#model: gemini/gemini-3-pro-preview
+model: gemini/gemini-2.5-pro
 editor-model: gemini/gemini-2.5-pro
 weak-model: gemini/gemini-2.5-flash
 
