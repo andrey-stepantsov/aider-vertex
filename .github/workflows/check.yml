@@ -1,22 +1,24 @@
 name: "CI Build Check"
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - 'agent/**'  # <--- Add this so the agent can trigger builds
   pull_request:
     branches: [ main ]
+  workflow_dispatch: # <--- Allows manual triggering if needed
 
 jobs:
   check-build:
     strategy:
       matrix:
-        # Verify both Linux (CentOS/Ubuntu proxy) and Intel macOS
+        # We verify both, but the agent will focus on the Linux logs
         os: [ubuntu-latest, macos-13] 
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v25
         with:
-          # Faster builds using the public Nix cache
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Aider-Vertex
         run: nix build . -L
