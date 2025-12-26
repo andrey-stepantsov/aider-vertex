@@ -622,6 +622,26 @@
                 };
 
                 # --- FIX: Hybrid Build Strategy (Rust Packages) ---
+                # FIX: Force wheel on Darwin for pydantic-core
+                pydantic-core = if pkgs.stdenv.isLinux then prev.pydantic-core.overridePythonAttrs (old: {
+                  nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+                    pkgs.rustPlatform.maturinBuildHook 
+                    pkgs.python311Packages.maturin
+                  ];
+                }) else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "pydantic_core";
+                  version = prev.pydantic-core.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
+
                 rpds-py = if pkgs.stdenv.isLinux then 
                   pkgs.python311Packages.buildPythonPackage rec {
                     pname = "rpds_py";
