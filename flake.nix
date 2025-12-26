@@ -474,6 +474,7 @@
                     platform = "macosx_11_0_arm64";
                     hash = "sha256-MMXgy1rkk8BMi0KRblLKOAefGyNcL4rl9FJ7ljxAHK8=";
                   };
+                  propagatedBuildInputs = [ final.pycparser ];
                 };
 
                 # FIX: Force wheel on Darwin for cryptography
