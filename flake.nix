@@ -383,14 +383,14 @@
 
                 # FIX: Update tree-sitter-yaml source from GitHub and use compatible headers
                 tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
-                  version = "0.7.1-git-latest";
+                  version = "0.7.1";
                   preferWheel = false;
                   src = pkgs.fetchFromGitHub {
-                     owner = "tree-sitter-grammars";
+                     owner = "tree-sitter";
                      repo = "tree-sitter-yaml";
-                     rev = "master"; 
-                     # Placeholder hash to force an update to the latest master commit
-                     hash = "sha256-BX6TOfAZLW+0h2TNsgsLC9K2lfirraCWlBN2vCKiXQ4=";
+                     rev = "v0.7.1";
+                     # Placeholder hash to be updated
+                     hash = "sha256-0000000000000000000000000000000000000000000=";
                   };
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.python311Packages.setuptools 
