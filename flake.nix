@@ -4,7 +4,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     poetry2nix = {
-      url = "github:nix-community/poetry2nix";
+      # Verified working tag via manual nix flake metadata check
+      url = "github:nix-community/poetry2nix?ref=2024.11.143775";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
