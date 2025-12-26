@@ -384,10 +384,10 @@
                 tree-sitter-yaml = prev.tree-sitter-yaml.overridePythonAttrs (old: {
                   version = "0.7.1";
                   preferWheel = false;
-                  src = pkgs.fetchzip {
-                    url = "https://github.com/d-ema/tree-sitter-yaml/archive/refs/tags/v0.7.1.tar.gz";
-                    # Placeholder hash to be updated
-                    hash = "sha256-G9U3W7s1s2rL2c0z+xVbS6p1aG7bL9a5m4o7t6d5k8Y=";
+                  src = pkgs.fetchPypi {
+                    pname = "tree-sitter-yaml";
+                    version = "0.7.1";
+                    hash = "sha256-R4WqF3G52T2x+Qy6tT8S8gJ7k8m/o4x3g2B1z3d4e5f=";
                   };
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.python311Packages.setuptools 
