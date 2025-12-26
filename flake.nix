@@ -463,7 +463,7 @@
                 # FIX: Force wheel on Darwin for google-crc32c
                 google-crc32c = if pkgs.stdenv.isLinux then prev.google-crc32c.overridePythonAttrs googleFix
                 else pkgs.python311Packages.buildPythonPackage rec {
-                  pname = "google-crc32c";
+                  pname = "google_crc32c";
                   version = prev.google-crc32c.version;
                   format = "wheel";
                   src = pkgs.fetchPypi {
