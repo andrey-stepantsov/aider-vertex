@@ -177,7 +177,7 @@
                 });
 
                 # Fix frozenlist metadata error
-                frozenlist = prev.frozenlist.overridePythonAttrs (old: {
+                frozenlist = if pkgs.stdenv.isLinux then prev.frozenlist.overridePythonAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.python311Packages.hatchling 
                     pkgs.python311Packages.hatch-vcs 
@@ -188,7 +188,19 @@
                       sed -i '/\[project\]/a license = {text = "Apache-2.0"}' pyproject.toml
                     fi
                   '';
-                });
+                }) else pkgs.python311Packages.buildPythonPackage rec {
+                  pname = "frozenlist";
+                  version = prev.frozenlist.version;
+                  format = "wheel";
+                  src = pkgs.fetchPypi {
+                    inherit pname version format;
+                    dist = "cp311";
+                    python = "cp311";
+                    abi = "cp311";
+                    platform = "macosx_11_0_arm64";
+                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                  };
+                };
 
                 # Fix Pillow metadata
                 pillow = prev.pillow.overridePythonAttrs (old: {
