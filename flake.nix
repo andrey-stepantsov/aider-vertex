@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     poetry2nix = {
-      url = "github:nix-community/poetry2nix/9018445173e3519d1912a7a40b8a1c8f4974f0c4";
+      url = "github:nix-community/poetry2nix/e917d8486716075902264563456b27e69f82d1c6";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
