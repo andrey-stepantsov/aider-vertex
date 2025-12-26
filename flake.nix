@@ -704,7 +704,7 @@
                     python = "cp311";
                     abi = "cp311";
                     platform = "macosx_11_0_arm64"; # Platform for version 0.19.1
-                    hash = "sha256-0000000000000000000000000000000000000000000=";
+                    hash = "sha256-3fZy7XGbTtgrUUmRAPVBfX2fb7BaZeIyJJJo813l7RQ=";
                   };
                 };
               })
