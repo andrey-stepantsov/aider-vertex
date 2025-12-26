@@ -378,7 +378,7 @@
                      repo = "tree-sitter-yaml";
                      rev = "master"; 
                      # Placeholder hash to force an update to the latest master commit
-                     hash = "sha256-0000000000000000000000000000000000000000000=";
+                     hash = "sha256-BX6TOfAZLW+0h2TNsgsLC9K2lfirraCWlBN2vCKiXQ4=";
                   };
                   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
                     pkgs.python311Packages.setuptools 
