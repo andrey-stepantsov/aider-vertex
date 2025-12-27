@@ -29,18 +29,24 @@ let
       };
       
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        # Use STABLE hook (prevents 'concatTo' shell errors)
+        # CRITICAL HYBRID SETUP:
+        # 1. Use STABLE maturin hook (prevents 'concatTo' shell errors)
         pkgs.rustPlatform.maturinBuildHook
-        pkgs.rustPlatform.cargoSetupHook
-        # Include UNSTABLE tools in path
+        
+        # 2. Use UNSTABLE cargo setup hook (understands fetchCargoVendor structure)
+        unstable.rustPlatform.cargoSetupHook
+        
+        # 3. Use UNSTABLE toolchain (understands v4 Cargo.lock)
         unstable.cargo
         unstable.rustc
       ];
 
-      # CRITICAL: Force maturin/cargo hooks to use the UNSTABLE binaries
-      # This fixes the "lock file version 4" error by using a modern Cargo
+      # FORCE overrides for the toolchain to ensure hooks use the newer versions
       CARGO = "${unstable.cargo}/bin/cargo";
       RUSTC = "${unstable.rustc}/bin/rustc";
+
+      # Ensure hooks know where to find the manifest
+      cargoRoot = ".";
 
       # FIX: Manually unpack because poetry2nix incorrectly assumes this is a wheel
       unpackPhase = ''
@@ -62,12 +68,16 @@ let
   # ---------------------------------------------------------------------------
   # 2. MACOS: Only applied on Darwin (Manual Wheels)
   # ---------------------------------------------------------------------------
-  darwin = if pkgs.stdenv.isDarwin then {} else {};
+  darwin = if pkgs.stdenv.isDarwin then {
+    # Place your yarl/shapely/tokenizers manual wheel blocks here if they exist
+    # ...
+  } else {};
 
   # ---------------------------------------------------------------------------
   # 3. LINUX: Only applied on Linux (Source builds & Manylinux fixes)
   # ---------------------------------------------------------------------------
   linux = if pkgs.stdenv.isLinux then {
+     # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
@@ -75,4 +85,5 @@ let
   } else {};
 
 in
+  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
