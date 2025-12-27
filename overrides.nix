@@ -30,6 +30,11 @@ let
           hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
         };
 
+        # HACK: Do NOT set 'cargoDeps'. 
+        # We rename it to 'srcCargoDeps' so we can use it manually in preConfigure
+        # without triggering the automatic cargoSetupHook.
+        srcCargoDeps = rustDeps;
+        
         # Disable automatic Rust hooks to prevent conflicts. 
         # We only need the binaries.
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
@@ -53,15 +58,17 @@ let
         # FIX: Manual Configure (Vendor setup)
         # Bypasses cargoSetupHook validation logic
         preConfigure = ''
-          echo ">>> Manual Cargo Config"
+          echo ">>> Manual Cargo Config: Pointing to vendor directory: $srcCargoDeps"
           mkdir -p .cargo
           cat > .cargo/config.toml <<EOF
           [source.crates-io]
           replace-with = "vendored-sources"
 
           [source.vendored-sources]
-          directory = "${rustDeps}"
+          directory = "$srcCargoDeps"
           EOF
+          
+          # Ensure Cargo uses this config
           export CARGO_HOME=$(pwd)/.cargo
         '';
 
@@ -77,17 +84,23 @@ let
           maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
         '';
 
-        # FIX: Manual Install
-        # Maturin outputs a wheel to ./target/wheels. We install it with pip.
+        # FIX: Manual Install & Satisfy poetry2nix dist expectations
         installPhase = ''
           echo ">>> Manual InstallPhase"
           mkdir -p $out
+          
           # Find the built wheel
           wheel=$(find target/wheels -name "*.whl" | head -n 1)
           if [ -z "$wheel" ]; then echo "❌ Error: No wheel found"; exit 1; fi
           
           echo ">>> Installing $wheel"
           pip install --no-deps --prefix=$out "$wheel"
+          
+          # CRITICAL FIX: poetry2nix's pythonOutputDistPhase expects the built artifacts in ./dist
+          # If we don't put them there, the build fails after installation.
+          echo ">>> Copying wheel to ./dist for poetry2nix compliance"
+          mkdir -p dist
+          cp "$wheel" dist/
         '';
 
         # Disable all automatic phases we replaced
