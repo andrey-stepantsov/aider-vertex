@@ -1,8 +1,3 @@
-Here is the full content for `overrides.nix`.
-
-This version includes the robust `preBuild` logic to handle the directory mismatch, along with debug logging so we can see exactly where the build lands if it fails again.
-
-```nix
 { pkgs, googleFix, unstable }:
 final: prev:
 let
@@ -87,5 +82,3 @@ let
 in
   # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
-
-```
