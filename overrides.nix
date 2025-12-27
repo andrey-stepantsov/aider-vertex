@@ -1,3 +1,8 @@
+Here is the full content for `overrides.nix`.
+
+This version includes the robust `preBuild` logic to handle the directory mismatch, along with debug logging so we can see exactly where the build lands if it fails again.
+
+```nix
 { pkgs, googleFix, unstable }:
 final: prev:
 let
@@ -22,6 +27,7 @@ let
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
 
+      # FIX: Use fetchCargoVendor from unstable (required for new lockfiles)
       cargoDeps = unstable.rustPlatform.fetchCargoVendor {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
@@ -29,16 +35,30 @@ let
       };
       
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+        # CRITICAL: Use STABLE hook to match shell, but UNSTABLE compiler for v4 lockfiles
         pkgs.rustPlatform.maturinBuildHook
         unstable.cargo
         unstable.rustc
       ];
 
-      # FIX: Manually enter the source directory.
-      # poetry2nix uses 'wheelUnpackPhase' which unpacks but doesn't 'cd'.
-      # We force entry so maturin can find Cargo.toml.
+      # FIX: Robustly find the source directory.
+      # poetry2nix's phase handling can sometimes leave us in /build root.
       preBuild = ''
-        cd rpds_py-0.22.3
+        echo ">>> [Debug] preBuild Start. Current Directory: $(pwd)"
+        ls -la
+        
+        # Try to enter the source dir if it exists
+        if [ -d "rpds_py-0.22.3" ]; then
+          echo ">>> Found rpds_py-0.22.3, entering..."
+          cd rpds_py-0.22.3
+        elif [ -d "rpds-py-0.22.3" ]; then
+          echo ">>> Found rpds-py-0.22.3, entering..."
+          cd rpds-py-0.22.3
+        else
+          echo ">>> WARNING: Could not find expected source directory. Attempting build in current dir."
+        fi
+        
+        echo ">>> [Debug] Final Build Directory: $(pwd)"
       '';
     });
 
@@ -67,3 +87,5 @@ let
 in
   # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
+
+```
