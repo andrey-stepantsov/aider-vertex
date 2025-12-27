@@ -29,33 +29,30 @@ let
       };
       
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+        # Use STABLE hook (prevents 'concatTo' shell errors)
         pkgs.rustPlatform.maturinBuildHook
+        pkgs.rustPlatform.cargoSetupHook
+        # Include UNSTABLE tools in path
         unstable.cargo
         unstable.rustc
       ];
 
-      # FIX: Explicitly unpack the source.
-      # poetry2nix mistakenly runs 'wheelUnpackPhase' on the tarball, resulting in an empty dir.
-      # We manually unpack and point Nix to the correct directory.
+      # CRITICAL: Force maturin/cargo hooks to use the UNSTABLE binaries
+      # This fixes the "lock file version 4" error by using a modern Cargo
+      CARGO = "${unstable.cargo}/bin/cargo";
+      RUSTC = "${unstable.rustc}/bin/rustc";
+
+      # FIX: Manually unpack because poetry2nix incorrectly assumes this is a wheel
       unpackPhase = ''
         echo ">>> Manual UnpackPhase: Extracting $src"
         tar -xf $src
-        
-        # Find the directory created (e.g., rpds_py-0.22.3)
         srcDir=$(find . -maxdepth 1 -type d -name "rpds_py*" -o -name "rpds-py*" | head -n 1)
-        
-        if [ -z "$srcDir" ]; then
-            echo "❌ Error: Could not find extracted directory"
-            ls -la
-            exit 1
-        fi
-        
+        if [ -z "$srcDir" ]; then echo "❌ Error: Could not find extracted directory"; exit 1; fi
         echo ">>> Setting sourceRoot to $srcDir"
         export sourceRoot="$srcDir"
       '';
 
-      # Stop poetry2nix from adding its own unpack hooks
-      # This effectively "empty" phase override prevents the conflict
+      # Disable poetry2nix's default wheel unpack logic
       wheelUnpackPhase = "true"; 
     });
 
@@ -65,16 +62,12 @@ let
   # ---------------------------------------------------------------------------
   # 2. MACOS: Only applied on Darwin (Manual Wheels)
   # ---------------------------------------------------------------------------
-  darwin = if pkgs.stdenv.isDarwin then {
-    # Place your yarl/shapely/tokenizers manual wheel blocks here if they exist
-    # ...
-  } else {};
+  darwin = if pkgs.stdenv.isDarwin then {} else {};
 
   # ---------------------------------------------------------------------------
   # 3. LINUX: Only applied on Linux (Source builds & Manylinux fixes)
   # ---------------------------------------------------------------------------
   linux = if pkgs.stdenv.isLinux then {
-     # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
@@ -82,5 +75,4 @@ let
   } else {};
 
 in
-  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
