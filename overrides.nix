@@ -22,7 +22,6 @@ let
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
 
-      # FIX: Use fetchCargoVendor from unstable (required for new lockfiles)
       cargoDeps = unstable.rustPlatform.fetchCargoVendor {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
@@ -30,13 +29,17 @@ let
       };
       
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        # CRITICAL FIX: Use the STABLE hook to match the shell environment.
         pkgs.rustPlatform.maturinBuildHook
-        
-        # Keep the UNSTABLE compiler to read the v4 Cargo.lock
         unstable.cargo
         unstable.rustc
       ];
+
+      # FIX: Manually enter the source directory.
+      # poetry2nix uses 'wheelUnpackPhase' which unpacks but doesn't 'cd'.
+      # We force entry so maturin can find Cargo.toml.
+      preBuild = ''
+        cd rpds_py-0.22.3
+      '';
     });
 
     watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
