@@ -22,15 +22,13 @@ let
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
 
-      # FIX: Use fetchCargoVendor (replaced fetchCargoTarball in newer nixpkgs)
-      # NOTE: Expect a hash mismatch on the first run.
+      # FIX: Hash updated for fetchCargoVendor
       cargoDeps = unstable.rustPlatform.fetchCargoVendor {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
-        hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
+        hash = "sha256-2skrDC80g0EKvTEeBI4t4LD7ZXb6jp2Gw+owKFrkZzc=";
       };
       
-      # FIX: Ensure the build environment also uses the newer Rust toolchain
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
         unstable.rustPlatform.maturinBuildHook
         unstable.cargo
@@ -46,14 +44,12 @@ let
   # ---------------------------------------------------------------------------
   darwin = if pkgs.stdenv.isDarwin then {
     # Place your yarl/shapely/tokenizers manual wheel blocks here if they exist
-    # ...
   } else {};
 
   # ---------------------------------------------------------------------------
   # 3. LINUX: Only applied on Linux (Source builds & Manylinux fixes)
   # ---------------------------------------------------------------------------
   linux = if pkgs.stdenv.isLinux then {
-     # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
@@ -61,5 +57,4 @@ let
   } else {};
 
 in
-  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
