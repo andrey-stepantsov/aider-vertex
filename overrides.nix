@@ -1,4 +1,4 @@
-{ pkgs, googleFix, unstable }: # <--- Accept unstable argument
+{ pkgs, googleFix, unstable }:
 final: prev:
 let
   # ---------------------------------------------------------------------------
@@ -21,9 +21,10 @@ let
         version = "0.22.3";
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
-      # FIX: Use unstable (newer Cargo) to fetch dependencies.
-      # This handles the v4 Lockfile without needing to delete it.
-      cargoDeps = unstable.rustPlatform.fetchCargoTarball {
+
+      # FIX: Use fetchCargoVendor (replaced fetchCargoTarball in newer nixpkgs)
+      # NOTE: Expect a hash mismatch on the first run.
+      cargoDeps = unstable.rustPlatform.fetchCargoVendor {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
         hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";

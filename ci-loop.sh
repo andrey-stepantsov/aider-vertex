@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+# --- LOGGING SETUP ---
+# Redirect all subsequent stdout (1) and stderr (2) to both the console and the log file.
+# NOTE: 'tee' without '-a' OVERWRITES the file, ensuring we only keep the last run.
+LOG_FILE="/tmp/ci-loop.log"
+echo ">>> Logging execution to: $LOG_FILE"
+exec > >(tee "$LOG_FILE") 2>&1
+
 # 0. Auto-commit dirty changes so they aren't left behind
 if [ -n "$(git status --porcelain)" ]; then
   echo ">>> [Local] Uncommitted changes detected. Committing as 'wip: auto-commit for CI'..."
