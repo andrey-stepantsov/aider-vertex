@@ -14,52 +14,58 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    rpds-py = prev.rpds-py.overridePythonAttrs (old: {
-      preferWheel = false; 
-      src = pkgs.fetchPypi {
-        pname = "rpds_py";
-        version = "0.22.3";
-        hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
-      };
+    rpds-py = prev.rpds-py.overridePythonAttrs (old: 
+      let
+        # Define dependencies locally so we can assign them explicitly
+        rustDeps = unstable.rustPlatform.fetchCargoVendor {
+          inherit (final.rpds-py) src;
+          name = "rpds-py-vendor";
+          hash = "sha256-2skrDC80g0EKvTEeBI4t4LD7ZXb6jp2Gw+owKFrkZzc=";
+        };
+      in {
+        preferWheel = false; 
+        src = pkgs.fetchPypi {
+          pname = "rpds_py";
+          version = "0.22.3";
+          hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
+        };
 
-      cargoDeps = unstable.rustPlatform.fetchCargoVendor {
-        inherit (final.rpds-py) src;
-        name = "rpds-py-vendor";
-        hash = "sha256-2skrDC80g0EKvTEeBI4t4LD7ZXb6jp2Gw+owKFrkZzc=";
-      };
-      
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        # CRITICAL HYBRID SETUP:
-        # 1. Use STABLE maturin hook (prevents 'concatTo' shell errors)
-        pkgs.rustPlatform.maturinBuildHook
+        # Standard attribute for rustPlatform
+        cargoDeps = rustDeps;
         
-        # 2. Use UNSTABLE cargo setup hook (understands fetchCargoVendor structure)
-        unstable.rustPlatform.cargoSetupHook
+        # CRITICAL FIX: Explicitly set the env var for cargoSetupHook
+        # This prevents the "Expected to find it at: /Cargo.lock" error
+        cargoVendorDir = rustDeps;
         
-        # 3. Use UNSTABLE toolchain (understands v4 Cargo.lock)
-        unstable.cargo
-        unstable.rustc
-      ];
+        nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+          # Stable maturin hook (avoids shell errors)
+          pkgs.rustPlatform.maturinBuildHook
+          # Unstable cargo setup hook (understands fetchCargoVendor)
+          unstable.rustPlatform.cargoSetupHook
+          # Unstable tools (understands v4 lockfiles)
+          unstable.cargo
+          unstable.rustc
+        ];
 
-      # FORCE overrides for the toolchain to ensure hooks use the newer versions
-      CARGO = "${unstable.cargo}/bin/cargo";
-      RUSTC = "${unstable.rustc}/bin/rustc";
+        # Force hooks to use the unstable binaries
+        CARGO = "${unstable.cargo}/bin/cargo";
+        RUSTC = "${unstable.rustc}/bin/rustc";
+        
+        # Ensure validation looks in the correct source directory
+        cargoRoot = ".";
 
-      # Ensure hooks know where to find the manifest
-      cargoRoot = ".";
+        # Manual unpack to handle tarball correctly
+        unpackPhase = ''
+          echo ">>> Manual UnpackPhase: Extracting $src"
+          tar -xf $src
+          srcDir=$(find . -maxdepth 1 -type d -name "rpds_py*" -o -name "rpds-py*" | head -n 1)
+          if [ -z "$srcDir" ]; then echo "❌ Error: Could not find extracted directory"; exit 1; fi
+          echo ">>> Setting sourceRoot to $srcDir"
+          export sourceRoot="$srcDir"
+        '';
 
-      # FIX: Manually unpack because poetry2nix incorrectly assumes this is a wheel
-      unpackPhase = ''
-        echo ">>> Manual UnpackPhase: Extracting $src"
-        tar -xf $src
-        srcDir=$(find . -maxdepth 1 -type d -name "rpds_py*" -o -name "rpds-py*" | head -n 1)
-        if [ -z "$srcDir" ]; then echo "❌ Error: Could not find extracted directory"; exit 1; fi
-        echo ">>> Setting sourceRoot to $srcDir"
-        export sourceRoot="$srcDir"
-      '';
-
-      # Disable poetry2nix's default wheel unpack logic
-      wheelUnpackPhase = "true"; 
+        # Disable default wheel unpacking
+        wheelUnpackPhase = "true"; 
     });
 
     watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
@@ -68,16 +74,12 @@ let
   # ---------------------------------------------------------------------------
   # 2. MACOS: Only applied on Darwin (Manual Wheels)
   # ---------------------------------------------------------------------------
-  darwin = if pkgs.stdenv.isDarwin then {
-    # Place your yarl/shapely/tokenizers manual wheel blocks here if they exist
-    # ...
-  } else {};
+  darwin = if pkgs.stdenv.isDarwin then {} else {};
 
   # ---------------------------------------------------------------------------
   # 3. LINUX: Only applied on Linux (Source builds & Manylinux fixes)
   # ---------------------------------------------------------------------------
   linux = if pkgs.stdenv.isLinux then {
-     # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
@@ -85,5 +87,4 @@ let
   } else {};
 
 in
-  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
