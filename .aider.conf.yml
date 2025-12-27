@@ -1,1 +1,14 @@
-model: vertex_ai/gemini-2.5-flash
+#model: vertex_ai/gemini-2.5-flash
+#model: gemini/gemini-3-pro-preview
+model: gemini/gemini-2.5-pro
+editor-model: gemini/gemini-2.5-pro
+weak-model: gemini/gemini-2.5-flash
+
+read:
+  - CONVENTIONS.md
+
+# Auto-test command: Rebuild the wiki after edits
+test-cmd: "./ci-loop.sh"
+edit-format: whole
+
+
