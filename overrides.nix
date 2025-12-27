@@ -22,7 +22,6 @@ let
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
 
-      # FIX: Use fetchCargoVendor from unstable (required for new lockfiles)
       cargoDeps = unstable.rustPlatform.fetchCargoVendor {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
@@ -35,12 +34,29 @@ let
         unstable.rustc
       ];
 
-      # FIX: Explicitly unpack because poetry2nix might default to wheelUnpackPhase
+      # FIX: Explicitly unpack the source.
+      # poetry2nix mistakenly runs 'wheelUnpackPhase' on the tarball, resulting in an empty dir.
+      # We manually unpack and point Nix to the correct directory.
       unpackPhase = ''
+        echo ">>> Manual UnpackPhase: Extracting $src"
         tar -xf $src
-        sourceRoot=$(find . -maxdepth 1 -type d -name "rpds_py*" -o -name "rpds-py*" | head -n 1)
-        export sourceRoot
+        
+        # Find the directory created (e.g., rpds_py-0.22.3)
+        srcDir=$(find . -maxdepth 1 -type d -name "rpds_py*" -o -name "rpds-py*" | head -n 1)
+        
+        if [ -z "$srcDir" ]; then
+            echo "❌ Error: Could not find extracted directory"
+            ls -la
+            exit 1
+        fi
+        
+        echo ">>> Setting sourceRoot to $srcDir"
+        export sourceRoot="$srcDir"
       '';
+
+      # Stop poetry2nix from adding its own unpack hooks
+      # This effectively "empty" phase override prevents the conflict
+      wheelUnpackPhase = "true"; 
     });
 
     watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
