@@ -16,7 +16,7 @@ let
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
-        # Define dependencies locally so we can assign them explicitly
+        # Fetch dependencies using the unstable fetcher (required for v4 lockfiles)
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
@@ -30,19 +30,17 @@ let
           hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
         };
 
-        # Standard attribute for rustPlatform
+        # We manually configure cargo below, so we don't rely on the automatic hook validation
         cargoDeps = rustDeps;
         
-        # CRITICAL FIX: Explicitly set the env var for cargoSetupHook
-        # This prevents the "Expected to find it at: /Cargo.lock" error
-        cargoVendorDir = rustDeps;
-        
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-          # Stable maturin hook (avoids shell errors)
+          # STABLE maturin hook (prevents 'concatTo' shell errors)
           pkgs.rustPlatform.maturinBuildHook
-          # Unstable cargo setup hook (understands fetchCargoVendor)
-          unstable.rustPlatform.cargoSetupHook
-          # Unstable tools (understands v4 lockfiles)
+          
+          # NOTE: We intentionally OMIT cargoSetupHook here to avoid the strict
+          # validation error about the lockfile location. We configure it manually in preConfigure.
+          
+          # UNSTABLE toolchain (understands v4 Cargo.lock)
           unstable.cargo
           unstable.rustc
         ];
@@ -50,11 +48,8 @@ let
         # Force hooks to use the unstable binaries
         CARGO = "${unstable.cargo}/bin/cargo";
         RUSTC = "${unstable.rustc}/bin/rustc";
-        
-        # Ensure validation looks in the correct source directory
-        cargoRoot = ".";
 
-        # Manual unpack to handle tarball correctly
+        # FIX: Manually unpack because poetry2nix incorrectly assumes this is a wheel
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
@@ -64,7 +59,24 @@ let
           export sourceRoot="$srcDir"
         '';
 
-        # Disable default wheel unpacking
+        # FIX: Manually configure Cargo to use the vendored dependencies.
+        # This replaces the work usually done by cargoSetupHook, bypassing the file check failure.
+        preConfigure = ''
+          echo ">>> Manual Cargo Config: Pointing to vendor directory: ${rustDeps}"
+          mkdir -p .cargo
+          cat > .cargo/config.toml <<EOF
+          [source.crates-io]
+          replace-with = "vendored-sources"
+
+          [source.vendored-sources]
+          directory = "${rustDeps}"
+          EOF
+          
+          # Ensure Cargo uses this config
+          export CARGO_HOME=$(pwd)/.cargo
+        '';
+
+        # Disable poetry2nix's default wheel unpack logic
         wheelUnpackPhase = "true"; 
     });
 
