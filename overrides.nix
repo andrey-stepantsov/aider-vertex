@@ -16,7 +16,7 @@ let
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
-        # Fetch dependencies using the unstable fetcher
+        # Fetch dependencies using the unstable fetcher (required for v4 lockfiles)
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
@@ -30,42 +30,67 @@ let
           hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
         };
 
-        # Explicitly tell the hook where the vendor dir is
-        cargoVendorDir = rustDeps;
-        
+        # Disable automatic Rust hooks to prevent conflicts. 
+        # We only need the binaries.
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-          # Stable maturin hook
-          pkgs.rustPlatform.maturinBuildHook
-          # Unstable cargo setup hook (required for fetchCargoVendor)
-          unstable.rustPlatform.cargoSetupHook
-          # Unstable toolchain (required for v4 Cargo.lock)
           unstable.cargo
           unstable.rustc
+          unstable.maturin # Use binary directly
+          pkgs.python311Packages.pip # Needed for install phase
         ];
 
-        CARGO = "${unstable.cargo}/bin/cargo";
-        RUSTC = "${unstable.rustc}/bin/rustc";
-
-        # FIX: Manual unpack + Lockfile Hack
-        # 1. Unpack the tarball.
-        # 2. Find the directory.
-        # 3. COPY the Cargo.lock to the root of the build dir so the setup hook finds it.
+        # FIX: Manual Unpack
+        # poetry2nix mistakenly treats the tarball as a wheel, creating empty dirs.
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
           srcDir=$(find . -maxdepth 1 -type d -name "rpds_py*" -o -name "rpds-py*" | head -n 1)
           if [ -z "$srcDir" ]; then echo "❌ Error: Could not find extracted directory"; exit 1; fi
-          
-          echo ">>> Found source dir: $srcDir"
-          
-          # HACK: cargoSetupHook looks for Cargo.lock in the current dir ($PWD)
-          # even if we set sourceRoot. So we put a copy right here.
-          cp "$srcDir/Cargo.lock" Cargo.lock
-          
           echo ">>> Setting sourceRoot to $srcDir"
           export sourceRoot="$srcDir"
         '';
 
+        # FIX: Manual Configure (Vendor setup)
+        # Bypasses cargoSetupHook validation logic
+        preConfigure = ''
+          echo ">>> Manual Cargo Config"
+          mkdir -p .cargo
+          cat > .cargo/config.toml <<EOF
+          [source.crates-io]
+          replace-with = "vendored-sources"
+
+          [source.vendored-sources]
+          directory = "${rustDeps}"
+          EOF
+          export CARGO_HOME=$(pwd)/.cargo
+        '';
+
+        # FIX: Manual Build using Maturin directly
+        # Bypasses maturinBuildHook which was using the wrong (stable) Cargo version
+        buildPhase = ''
+          echo ">>> Manual BuildPhase with Maturin"
+          # Ensure we use the unstable cargo
+          export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
+          
+          # Run maturin manually. 
+          # -i python tells it which python interpreter to build for
+          maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
+        '';
+
+        # FIX: Manual Install
+        # Maturin outputs a wheel to ./target/wheels. We install it with pip.
+        installPhase = ''
+          echo ">>> Manual InstallPhase"
+          mkdir -p $out
+          # Find the built wheel
+          wheel=$(find target/wheels -name "*.whl" | head -n 1)
+          if [ -z "$wheel" ]; then echo "❌ Error: No wheel found"; exit 1; fi
+          
+          echo ">>> Installing $wheel"
+          pip install --no-deps --prefix=$out "$wheel"
+        '';
+
+        # Disable all automatic phases we replaced
         wheelUnpackPhase = "true"; 
     });
 
