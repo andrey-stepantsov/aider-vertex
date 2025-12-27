@@ -22,7 +22,7 @@ let
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
 
-      # FIX: Hash updated for fetchCargoVendor
+      # FIX: Use fetchCargoVendor from unstable (required for new lockfiles)
       cargoDeps = unstable.rustPlatform.fetchCargoVendor {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
@@ -30,7 +30,10 @@ let
       };
       
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        unstable.rustPlatform.maturinBuildHook
+        # CRITICAL FIX: Use the STABLE hook to match the shell environment.
+        pkgs.rustPlatform.maturinBuildHook
+        
+        # Keep the UNSTABLE compiler to read the v4 Cargo.lock
         unstable.cargo
         unstable.rustc
       ];
@@ -44,12 +47,14 @@ let
   # ---------------------------------------------------------------------------
   darwin = if pkgs.stdenv.isDarwin then {
     # Place your yarl/shapely/tokenizers manual wheel blocks here if they exist
+    # ...
   } else {};
 
   # ---------------------------------------------------------------------------
   # 3. LINUX: Only applied on Linux (Source builds & Manylinux fixes)
   # ---------------------------------------------------------------------------
   linux = if pkgs.stdenv.isLinux then {
+     # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
@@ -57,4 +62,5 @@ let
   } else {};
 
 in
+  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
