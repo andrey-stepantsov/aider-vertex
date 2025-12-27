@@ -16,7 +16,6 @@ let
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
-        # Fetch dependencies using the unstable fetcher (required for v4 lockfiles)
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
@@ -30,19 +29,19 @@ let
           hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
         };
 
-        # We manually configure cargo below, so we don't rely on the automatic hook validation
-        cargoDeps = rustDeps;
+        # HACK: Do NOT set 'cargoDeps'. 
+        # If we set it, the automatic cargoSetupHook will try to run and fail validation.
+        # We handle vendoring manually in preConfigure.
         
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           # STABLE maturin hook (prevents 'concatTo' shell errors)
           pkgs.rustPlatform.maturinBuildHook
           
-          # NOTE: We intentionally OMIT cargoSetupHook here to avoid the strict
-          # validation error about the lockfile location. We configure it manually in preConfigure.
-          
           # UNSTABLE toolchain (understands v4 Cargo.lock)
           unstable.cargo
           unstable.rustc
+          
+          # NOTE: cargoSetupHook REMOVED to avoid lockfile validation errors
         ];
 
         # Force hooks to use the unstable binaries
