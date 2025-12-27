@@ -30,4 +30,23 @@ We use a custom script to allow AI agents to "see" build failures on GitHub Acti
     1.  Make changes to `overrides.nix`.
     2.  Run `./ci-loop.sh` (this commits, pushes to `agent/` branch, and streams logs).
     3.  Analyze the logs printed to the terminal.
-    4.  Repeat.
+    4.  Repeat.## 5. Dependency Management Rules (The "Time Travel" Protocol)
+Due to a timeline mismatch between `poetry2nix` (frozen ~April 2025 state) and `nixpkgs-unstable` (containing newer `riscv64` definitions), we strictly adhere to the following:
+
+### A. The Nixpkgs Pin
+* **Rule:** We pin `nixpkgs` to `nixos-24.05` in `flake.nix`.
+* **Reason:** This ensures the underlying C++ libraries and Rust toolchains are compatible with the expectations of our `poetry2nix` version.
+
+### B. The Lockfile Sanitization
+* **Rule:** NEVER commit `poetry.lock` containing `riscv64` hashes.
+* **Action:** Always update dependencies using the helper script:
+    ```bash
+    ./update-deps.sh
+    ```
+* **Reason:** `poetry2nix` crashes immediately if it encounters these hashes.
+
+### C. Rust/Cargo Compatibility
+* **Rule:** If a Python package with Rust extensions (like `rpds-py`) fails with `lock file version 4 requires...`:
+    1.  Override the package in `overrides.nix`.
+    2.  Add a `postPatch` hook to delete `Cargo.lock`.
+    3.  Define `cargoDeps` manually using `pkgs.rustPlatform.fetchCargoTarball`.
