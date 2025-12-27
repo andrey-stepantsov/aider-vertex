@@ -30,54 +30,42 @@ let
           hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
         };
 
-        # HACK: Do NOT set 'cargoDeps'. 
-        # If we set it, the automatic cargoSetupHook will try to run and fail validation.
-        # We rename it to 'srcCargoDeps' so we can use it manually in preConfigure.
-        srcCargoDeps = rustDeps;
+        # Explicitly tell the hook where the vendor dir is
+        cargoVendorDir = rustDeps;
         
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-          # STABLE maturin hook (prevents 'concatTo' shell errors)
+          # Stable maturin hook
           pkgs.rustPlatform.maturinBuildHook
-          
-          # UNSTABLE toolchain (understands v4 Cargo.lock)
+          # Unstable cargo setup hook (required for fetchCargoVendor)
+          unstable.rustPlatform.cargoSetupHook
+          # Unstable toolchain (required for v4 Cargo.lock)
           unstable.cargo
           unstable.rustc
-          
-          # NOTE: cargoSetupHook is intentionally OMITTED to avoid lockfile validation errors
         ];
 
-        # Force hooks to use the unstable binaries
         CARGO = "${unstable.cargo}/bin/cargo";
         RUSTC = "${unstable.rustc}/bin/rustc";
 
-        # FIX: Manually unpack because poetry2nix incorrectly assumes this is a wheel
+        # FIX: Manual unpack + Lockfile Hack
+        # 1. Unpack the tarball.
+        # 2. Find the directory.
+        # 3. COPY the Cargo.lock to the root of the build dir so the setup hook finds it.
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
           srcDir=$(find . -maxdepth 1 -type d -name "rpds_py*" -o -name "rpds-py*" | head -n 1)
           if [ -z "$srcDir" ]; then echo "❌ Error: Could not find extracted directory"; exit 1; fi
+          
+          echo ">>> Found source dir: $srcDir"
+          
+          # HACK: cargoSetupHook looks for Cargo.lock in the current dir ($PWD)
+          # even if we set sourceRoot. So we put a copy right here.
+          cp "$srcDir/Cargo.lock" Cargo.lock
+          
           echo ">>> Setting sourceRoot to $srcDir"
           export sourceRoot="$srcDir"
         '';
 
-        # FIX: Manually configure Cargo to use the vendored dependencies.
-        # This replaces the work usually done by cargoSetupHook, bypassing the file check failure.
-        preConfigure = ''
-          echo ">>> Manual Cargo Config: Pointing to vendor directory: $srcCargoDeps"
-          mkdir -p .cargo
-          cat > .cargo/config.toml <<EOF
-          [source.crates-io]
-          replace-with = "vendored-sources"
-
-          [source.vendored-sources]
-          directory = "$srcCargoDeps"
-          EOF
-          
-          # Ensure Cargo uses this config
-          export CARGO_HOME=$(pwd)/.cargo
-        '';
-
-        # Disable poetry2nix's default wheel unpack logic
         wheelUnpackPhase = "true"; 
     });
 
@@ -87,12 +75,16 @@ let
   # ---------------------------------------------------------------------------
   # 2. MACOS: Only applied on Darwin (Manual Wheels)
   # ---------------------------------------------------------------------------
-  darwin = if pkgs.stdenv.isDarwin then {} else {};
+  darwin = if pkgs.stdenv.isDarwin then {
+    # Place your yarl/shapely/tokenizers manual wheel blocks here if they exist
+    # ...
+  } else {};
 
   # ---------------------------------------------------------------------------
   # 3. LINUX: Only applied on Linux (Source builds & Manylinux fixes)
   # ---------------------------------------------------------------------------
   linux = if pkgs.stdenv.isLinux then {
+     # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
@@ -100,4 +92,5 @@ let
   } else {};
 
 in
+  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
