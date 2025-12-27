@@ -26,6 +26,11 @@ let
         name = "rpds-py-vendor";
         hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
       };
+      # FIX: The upstream Cargo.lock is v4 (too new for NixOS 24.05).
+      # Deleting it forces Cargo to generate a compatible lockfile using your current compiler.
+      postPatch = (old.postPatch or "") + ''
+        rm Cargo.lock
+      '';
     });
 
     watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
