@@ -4,8 +4,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     poetry2nix = {
-      # Verified stable release from March 2025 (Fixes riscv64 + HTTP 422 syntax)
-      url = "github:nix-community/poetry2nix?ref=2025.3.1955794";
+      # Use master to get the latest architecture support (fixes riscv64)
+      url = "github:nix-community/poetry2nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
