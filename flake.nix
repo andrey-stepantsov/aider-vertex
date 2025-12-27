@@ -4,6 +4,9 @@
   inputs = {
     # Downgrade to 24.05 to match the frozen state of poetry2nix
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    
+    # ADD: Unstable for modern Rust toolchains (fixes rpds-py lockfile v4 errors)
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     poetry2nix = {
       url = "github:nix-community/poetry2nix";
@@ -11,7 +14,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, poetry2nix }:
+  outputs = { self, nixpkgs, nixpkgs-unstable, poetry2nix }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -20,6 +23,9 @@
       packages = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          # ADD: Access to unstable packages
+          unstable = nixpkgs-unstable.legacyPackages.${system};
+          
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
 
           googleFix = old: {
@@ -40,7 +46,8 @@
 
             overrides = [
               p2n.defaultPoetryOverrides
-              (import ./overrides.nix { inherit pkgs googleFix; })
+              # CHANGE: Pass 'unstable' to overrides
+              (import ./overrides.nix { inherit pkgs googleFix unstable; })
             ];
 
             postFixup = ''

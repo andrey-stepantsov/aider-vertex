@@ -1,4 +1,4 @@
-{ pkgs, googleFix }:
+{ pkgs, googleFix, unstable }: # <--- Accept unstable argument
 final: prev:
 let
   # ---------------------------------------------------------------------------
@@ -21,16 +21,20 @@ let
         version = "0.22.3";
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
-      cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
+      # FIX: Use unstable (newer Cargo) to fetch dependencies.
+      # This handles the v4 Lockfile without needing to delete it.
+      cargoDeps = unstable.rustPlatform.fetchCargoTarball {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
         hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
       };
-      # FIX: The upstream Cargo.lock is v4 (too new for NixOS 24.05).
-      # Deleting it forces Cargo to generate a compatible lockfile using your current compiler.
-      postPatch = (old.postPatch or "") + ''
-        rm Cargo.lock
-      '';
+      
+      # FIX: Ensure the build environment also uses the newer Rust toolchain
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+        unstable.rustPlatform.maturinBuildHook
+        unstable.cargo
+        unstable.rustc
+      ];
     });
 
     watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
