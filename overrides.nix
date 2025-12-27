@@ -16,6 +16,7 @@ let
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
+        # Fetch dependencies using the unstable fetcher
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
@@ -31,7 +32,8 @@ let
 
         # HACK: Do NOT set 'cargoDeps'. 
         # If we set it, the automatic cargoSetupHook will try to run and fail validation.
-        # We handle vendoring manually in preConfigure.
+        # We rename it to 'srcCargoDeps' so we can use it manually in preConfigure.
+        srcCargoDeps = rustDeps;
         
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           # STABLE maturin hook (prevents 'concatTo' shell errors)
@@ -41,7 +43,7 @@ let
           unstable.cargo
           unstable.rustc
           
-          # NOTE: cargoSetupHook REMOVED to avoid lockfile validation errors
+          # NOTE: cargoSetupHook is intentionally OMITTED to avoid lockfile validation errors
         ];
 
         # Force hooks to use the unstable binaries
@@ -61,14 +63,14 @@ let
         # FIX: Manually configure Cargo to use the vendored dependencies.
         # This replaces the work usually done by cargoSetupHook, bypassing the file check failure.
         preConfigure = ''
-          echo ">>> Manual Cargo Config: Pointing to vendor directory: ${rustDeps}"
+          echo ">>> Manual Cargo Config: Pointing to vendor directory: $srcCargoDeps"
           mkdir -p .cargo
           cat > .cargo/config.toml <<EOF
           [source.crates-io]
           replace-with = "vendored-sources"
 
           [source.vendored-sources]
-          directory = "${rustDeps}"
+          directory = "$srcCargoDeps"
           EOF
           
           # Ensure Cargo uses this config
