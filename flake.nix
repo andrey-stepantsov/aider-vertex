@@ -2,9 +2,10 @@
   description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.0.3-modular)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    # Downgrade to 24.05 to match the frozen state of poetry2nix
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+
     poetry2nix = {
-      # Use master to get the latest architecture support (fixes riscv64)
       url = "github:nix-community/poetry2nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -14,12 +15,13 @@
     let
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
-    in {
+    in
+    {
       packages = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
-          
+
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -28,7 +30,8 @@
               fi
             '';
           };
-        in {
+        in
+        {
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
@@ -51,8 +54,8 @@
 
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
-          packages = [ 
-            self.packages.${system}.default 
+          packages = [
+            self.packages.${system}.default
             nixpkgs.legacyPackages.${system}.gh
           ];
         };
