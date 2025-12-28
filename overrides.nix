@@ -23,7 +23,8 @@ let
         unstable.pkg-config
         unstable.gfortran
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-        unstable.darwin.apple_sdk.frameworks.Accelerate
+        # Use stable frameworks to avoid "apple_sdk_11_0 removed" errors in unstable
+        pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
 
       # SHIM: Define concatTo for unstable hooks running in stable stdenv
