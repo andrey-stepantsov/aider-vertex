@@ -2,26 +2,9 @@
 final: prev:
 let
   # ---------------------------------------------------------------------------
-  # Helper: Compatibility hook for unstable tools in stable stdenv
-  # ---------------------------------------------------------------------------
-  # Unstable meson/ninja hooks use 'concatTo', which is missing in stable stdenv.
-  # This hook injects it into the environment.
-  compatHook = pkgs.makeSetupHook {
-    name = "concatTo-compat-hook";
-  } (pkgs.writeText "concatTo-compat-hook.sh" ''
-    concatTo() {
-      local target="$1"
-      shift
-      cat "$@" >> "$target"
-    }
-    export -f concatTo
-  '');
-
-  # ---------------------------------------------------------------------------
   # 1. COMMON: Applies to both macOS and Linux
   # ---------------------------------------------------------------------------
   common = {
-    # ... existing overrides ...
     google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
     google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
     google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -32,16 +15,22 @@ let
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
     # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
+    # We avoid adding meson/ninja to nativeBuildInputs to prevent their setup hooks 
+    # from firing and failing (missing flags, missing concatTo, etc).
+    # Instead, we just add them to the PATH manually.
     scipy = prev.scipy.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        unstable.meson
-        unstable.ninja
         unstable.pkg-config
         unstable.gfortran
-        compatHook # <--- Inject the missing function here
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
+
+      # Manually add the unstable meson/ninja binaries to PATH.
+      # This gives pip access to them without triggering Nix's incompatible setup hooks.
+      preConfigure = ''
+        export PATH="${unstable.meson}/bin:${unstable.ninja}/bin:$PATH"
+      '';
 
       # Disable Nix's automatic meson configure phase.
       configurePhase = "true";
@@ -49,6 +38,7 @@ let
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
+        # Fetch dependencies using the unstable fetcher
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
@@ -61,9 +51,10 @@ let
           version = "0.22.3";
           hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
         };
-        
-        srcCargoDeps = rustDeps;
 
+        srcCargoDeps = rustDeps;
+        
+        # Disable automatic Rust hooks to prevent version conflicts.
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           unstable.cargo
           unstable.rustc
@@ -137,12 +128,16 @@ let
   # ---------------------------------------------------------------------------
   # 2. MACOS: Only applied on Darwin (Manual Wheels)
   # ---------------------------------------------------------------------------
-  darwin = if pkgs.stdenv.isDarwin then {} else {};
+  darwin = if pkgs.stdenv.isDarwin then {
+    # Place your yarl/shapely/tokenizers manual wheel blocks here if they exist
+    # ...
+  } else {};
 
   # ---------------------------------------------------------------------------
   # 3. LINUX: Only applied on Linux (Source builds & Manylinux fixes)
   # ---------------------------------------------------------------------------
   linux = if pkgs.stdenv.isLinux then {
+     # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
@@ -150,4 +145,5 @@ let
   } else {};
 
 in
+  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
