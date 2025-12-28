@@ -1,13 +1,6 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # ---------------------------------------------------------------------------
-  # Helper: Clean unstable tools without their hooks
-  # ---------------------------------------------------------------------------
-  cleanMeson = unstable.meson.overrideAttrs (old: {
-    setupHook = null;
-  });
-  
   cleanNinja = unstable.ninja.overrideAttrs (old: {
     setupHook = null;
   });
@@ -22,12 +15,19 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Override 'meson' Python package with the real unstable derivation (stripped).
-    # This ensures it has valid metadata and modules.
-    meson = cleanMeson;
+    # FIX: Rebuild 'meson' as a proper Python package from unstable source.
+    # This ensures it has valid metadata for pip and satisfies 'meson-python'.
+    # We use buildPythonPackage from pkgs (stable) but source from unstable.
+    meson = pkgs.python311Packages.buildPythonPackage {
+      pname = "meson";
+      version = unstable.meson.version;
+      src = unstable.meson.src;
+      format = "setuptools"; # Meson uses setup.py
+      doCheck = false;
+    };
 
-    # FIX: Override 'ninja' Python package with a dummy wrapper.
-    # The real python package build fails from source.
+    # FIX: Replace 'ninja' Python package with a dummy that provides the binary.
+    # The real ninja python package tries to build from source and fails.
     ninja = prev.ninja.overridePythonAttrs (old: {
       format = "other";
       buildCommand = ''
@@ -44,16 +44,15 @@ let
       propagatedBuildInputs = [ cleanNinja ];
     });
 
-    # FIX: meson-python needs meson.
-    # We add it to propagatedBuildInputs to ensure it's available in the env.
+    # FIX: meson-python needs meson available.
     meson-python = prev.meson-python.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
-      propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
     });
 
     # FIX: Scipy 1.15.3 requires newer meson.
     scipy = prev.scipy.overridePythonAttrs (old: {
-      # Filter out existing meson/ninja
+      # 1. Filter out existing meson/ninja
+      # 2. Add our clean/unstable versions.
       nativeBuildInputs = (pkgs.lib.filter 
         (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
         (old.nativeBuildInputs or [])) 
@@ -61,7 +60,7 @@ let
         final.meson 
         final.ninja
         unstable.pkg-config
-        unstable.gfortran
+        pkgs.gfortran # Use STABLE gfortran to fix macOS linking
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
