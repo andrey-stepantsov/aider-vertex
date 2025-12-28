@@ -2,13 +2,18 @@
 final: prev:
 let
   # ---------------------------------------------------------------------------
-  # Helper: Clean unstable tools without their hooks
+  # Helper: Clean binaries
   # ---------------------------------------------------------------------------
   cleanMesonBinary = unstable.meson.overrideAttrs (old: {
     setupHook = null;
   });
   
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: {
+    setupHook = null;
+  });
+
+  # Stable meson, but stripped of the hook that causes "concatTo: command not found"
+  stableMesonStripped = pkgs.meson.overrideAttrs (old: {
     setupHook = null;
   });
 
@@ -22,43 +27,20 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Override 'meson' Python package using buildPythonPackage.
-    # We use unstable version to satisfy Scipy 1.15.3 requirement (meson >= 1.5.0).
-    # We use a dummy source build that just symlinks the binary and modules.
-    meson = pkgs.python311Packages.buildPythonPackage {
-      pname = "meson";
-      version = unstable.meson.version;
-      format = "other";
-      src = ./.; # Dummy
-      unpackPhase = "true";
-      installPhase = ''
-        mkdir -p $out/bin
-        ln -s ${cleanMesonBinary}/bin/meson $out/bin/meson
-        
-        site_packages=$out/lib/python3.11/site-packages
-        mkdir -p $site_packages/meson-${unstable.meson.version}.dist-info
-        echo "Metadata-Version: 2.1" > $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
-        echo "Name: meson" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
-        echo "Version: ${unstable.meson.version}" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
-        
-        # Link the module so imports work
-        mkdir -p $site_packages
-        ln -s ${cleanMesonBinary}/lib/python*/site-packages/mesonbuild $site_packages/mesonbuild
-      '';
-      propagatedBuildInputs = [ cleanMesonBinary ];
-    };
+    # FIX: Use stable meson as the Python package (satisfies pip >= 0.63.3).
+    # We strip the hook to prevent Linux crashes.
+    meson = stableMesonStripped;
 
-    # FIX: Override 'ninja' Python package using buildPythonPackage.
+    # FIX: Use dummy ninja. Source build fails.
     ninja = pkgs.python311Packages.buildPythonPackage {
       pname = "ninja";
       version = unstable.ninja.version;
       format = "other";
-      src = ./.; # Dummy
+      src = ./.; 
       unpackPhase = "true";
       installPhase = ''
         mkdir -p $out/bin
         ln -s ${cleanNinjaBinary}/bin/ninja $out/bin/ninja
-        
         site_packages=$out/lib/python3.11/site-packages
         mkdir -p $site_packages/ninja-${unstable.ninja.version}.dist-info
         echo "Metadata-Version: 2.1" > $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
@@ -68,23 +50,29 @@ let
       propagatedBuildInputs = [ cleanNinjaBinary ];
     };
 
-    # FIX: meson-python needs meson available.
     meson-python = prev.meson-python.overridePythonAttrs (old: {
+      # Use our stripped stable meson
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
       propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
     });
+    
+    # pybind11 needs ninja
+    pybind11 = prev.pybind11.overridePythonAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
+    });
 
-    # FIX: Scipy 1.15.3 requires newer meson.
+    # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0) to RUN.
+    # We provide stable meson (pkg) for dependencies, but put unstable meson (bin) FIRST in PATH.
     scipy = prev.scipy.overridePythonAttrs (old: {
-      nativeBuildInputs = (pkgs.lib.filter 
-        (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
-        (old.nativeBuildInputs or [])) 
-      ++ [
-        final.meson 
+      nativeBuildInputs = [
+        cleanMesonBinary # Unstable (1.6.0) goes first!
         final.ninja
         unstable.pkg-config
         pkgs.gfortran
-      ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+      ] ++ (pkgs.lib.filter 
+        (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
+        (old.nativeBuildInputs or []))
+      ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
       
@@ -93,8 +81,8 @@ let
         pkgs.gfortran.cc.lib
       ];
       
-      # FIX: Ensure runtime libraries are found by meson/ld on macOS
       preConfigure = (old.preConfigure or "") + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+        export FC=${pkgs.gfortran}/bin/gfortran
         export LDFLAGS="-L${pkgs.gfortran.cc.lib}/lib -Wl,-rpath,${pkgs.gfortran.cc.lib}/lib $LDFLAGS"
       '';
 
