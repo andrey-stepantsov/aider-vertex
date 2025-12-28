@@ -1,10 +1,11 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
+  # Strip hooks from unstable tools to prevent Linux crashes (concatTo error)
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in {
-  # ... (Google overrides same) ...
+  # Standard Google Fixes
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
   google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -14,7 +15,7 @@ in {
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy tools
+  # 1. Dummy Meson (Linux specific hack)
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -34,6 +35,7 @@ in {
     propagatedBuildInputs = [ cleanMesonBinary ];
   };
 
+  # 2. Dummy Ninja (Linux specific hack)
   ninja = pkgs.python311Packages.buildPythonPackage {
     pname = "ninja";
     version = unstable.ninja.version;
@@ -75,7 +77,7 @@ in {
     propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
   });
 
-  # FIXED RPDS-PY: Build from source within the correct Python env
+  # FIXED RPDS-PY: Manual Build with Pip
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
       rustDeps = unstable.rustPlatform.fetchCargoVendor {
@@ -92,17 +94,15 @@ in {
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
       cargoDeps = rustDeps;
-      # Add pip to nativeBuildInputs!
+      # Includes pip and python3 explicitly
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        unstable.cargo unstable.rustc unstable.maturin pkgs.pkg-config pkgs.python311Packages.pip
+        unstable.cargo unstable.rustc unstable.maturin pkgs.pkg-config pkgs.python311Packages.pip pkgs.python3
       ];
       
-      # Use manual unpack to flatten dir so we know where Cargo.toml is
       unpackPhase = ''
         tar -xf $src --strip-components=1
       '';
       
-      # Manual cargo setup (because maturinBuildHook isn't running)
       preConfigure = ''
         mkdir -p .cargo
         cat > .cargo/config.toml <<EOF
@@ -114,7 +114,6 @@ in {
         export CARGO_HOME=$(pwd)/.cargo
       '';
 
-      # Manual build to bypass crashing hook
       buildPhase = ''
         export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
         maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
@@ -123,7 +122,7 @@ in {
       installPhase = ''
         mkdir -p $out
         wheel=$(find target/wheels -name "*.whl" | head -n 1)
-        pip install --no-deps --prefix=$out "$wheel"
+        python3 -m pip install --no-deps --prefix=$out "$wheel"
         mkdir -p dist && cp "$wheel" dist/
       '';
       
