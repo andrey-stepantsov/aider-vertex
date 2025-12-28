@@ -75,22 +75,25 @@ in {
   });
 
   # GRAFTED RPDS-PY
-  # Fixed: Inherit ALL patch mechanisms (patches, cargoPatches, postPatch) from Unstable
-  rpds-py = prev.rpds-py.overridePythonAttrs (old: {
+  # We completely replace the poetry derivation with a standard Nixpkgs buildPythonPackage
+  # This ensures cargoPatches and cargoSetupHook work exactly as they do in nixpkgs.
+  rpds-py = pkgs.python311Packages.buildPythonPackage {
+    pname = "rpds-py";
+    version = unstable.python311Packages.rpds-py.version;
     format = "pyproject";
-    inherit (unstable.python311Packages.rpds-py) src cargoDeps;
     
-    # Inherit any patches or post-patch logic that Unstable uses to inject Cargo.lock
+    # Inherit everything necessary from Unstable
+    inherit (unstable.python311Packages.rpds-py) src cargoDeps;
     patches = unstable.python311Packages.rpds-py.patches or [];
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
 
-    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+    nativeBuildInputs = [
       pkgs.cargo 
       pkgs.rustc 
       pkgs.rustPlatform.cargoSetupHook 
       pkgs.rustPlatform.maturinBuildHook 
       pkgs.pkg-config
     ];
-  });
+  };
 }

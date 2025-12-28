@@ -40,26 +40,29 @@ final: prev:
   });
 
   # GRAFTED RPDS-PY for Darwin
-  # Fixed: Inherit ALL patch mechanisms (patches, cargoPatches, postPatch) from Unstable
-  rpds-py = prev.rpds-py.overridePythonAttrs (old: {
+  # Clean build strategy for macOS as well
+  rpds-py = pkgs.python311Packages.buildPythonPackage {
+    pname = "rpds-py";
+    version = unstable.python311Packages.rpds-py.version;
     format = "pyproject";
-    inherit (unstable.python311Packages.rpds-py) src cargoDeps;
     
-    # Inherit patches to ensure Cargo.lock is present
+    inherit (unstable.python311Packages.rpds-py) src cargoDeps;
     patches = unstable.python311Packages.rpds-py.patches or [];
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
 
-    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+    nativeBuildInputs = [
       pkgs.cargo 
       pkgs.rustc 
       pkgs.rustPlatform.cargoSetupHook 
       pkgs.rustPlatform.maturinBuildHook 
       pkgs.pkg-config
-      pkgs.libiconv pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+      pkgs.libiconv 
+      pkgs.darwin.apple_sdk.frameworks.Security 
+      pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
     ];
-    buildInputs = (old.buildInputs or []) ++ [ pkgs.libiconv ];
-  });
+    buildInputs = [ pkgs.libiconv ];
+  };
   
   watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
 }
