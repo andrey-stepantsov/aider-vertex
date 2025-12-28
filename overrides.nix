@@ -22,33 +22,39 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Override 'meson' Python package with a dummy that satisfies pip
-    # but uses the system binary (unstable, hook-less).
+    # FIX: Override 'meson' Python package.
+    # We must satisfy pip (metadata), python imports (mesonbuild), and shell (bin/meson).
     meson = prev.meson.overridePythonAttrs (old: {
       format = "other";
       buildCommand = ''
-        # Link the binary so it's on PATH
+        # 1. Binary on PATH
         mkdir -p $out/bin
         ln -s ${cleanMesonBinary}/bin/meson $out/bin/meson
         
-        # Create metadata so pip thinks "meson >= 0.63.3" is installed
+        # 2. Python module (symlink from unstable source)
         site_packages=$out/lib/python3.11/site-packages
+        mkdir -p $site_packages
+        ln -s ${cleanMesonBinary}/lib/python*/site-packages/mesonbuild $site_packages/mesonbuild
+        
+        # 3. Metadata for pip
         mkdir -p $site_packages/meson-${unstable.meson.version}.dist-info
         echo "Metadata-Version: 2.1" > $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
         echo "Name: meson" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
         echo "Version: ${unstable.meson.version}" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
       '';
-      # Propagate the binary to ensure it's available
       propagatedBuildInputs = [ cleanMesonBinary ];
     });
 
-    # FIX: Override 'ninja' Python package similarly.
+    # FIX: Override 'ninja' Python package.
     ninja = prev.ninja.overridePythonAttrs (old: {
       format = "other";
       buildCommand = ''
+        # 1. Binary
         mkdir -p $out/bin
         ln -s ${cleanNinjaBinary}/bin/ninja $out/bin/ninja
         
+        # 2. Python module (ninja package usually has a small wrapper, but binary is key)
+        # We can just fake the package presence.
         site_packages=$out/lib/python3.11/site-packages
         mkdir -p $site_packages/ninja-${unstable.ninja.version}.dist-info
         echo "Metadata-Version: 2.1" > $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
@@ -65,8 +71,7 @@ let
 
     # FIX: Scipy 1.15.3 requires newer meson.
     scipy = prev.scipy.overridePythonAttrs (old: {
-      # Use our dummy python packages which provide the binaries + metadata.
-      # Filter out old ones.
+      # Use our robust dummy packages.
       nativeBuildInputs = (pkgs.lib.filter 
         (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
         (old.nativeBuildInputs or [])) 
@@ -83,7 +88,7 @@ let
       configurePhase = "true"; 
     });
 
-    # ... rpds-py override ...
+    # ... rpds-py ...
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
