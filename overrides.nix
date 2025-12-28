@@ -1,9 +1,6 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # ---------------------------------------------------------------------------
-  # Helper: Clean unstable tools without their hooks
-  # ---------------------------------------------------------------------------
   cleanMeson = unstable.meson.overrideAttrs (old: {
     setupHook = null;
   });
@@ -22,23 +19,28 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Don't let poetry2nix build meson/ninja from source (fails).
-    # Instead, point to our clean binaries. But since pip checks metadata,
-    # we will fix that by patching meson-python instead.
-    # So here, we just provide the binaries as "packages" so poetry2nix is happy.
+    # Override tools to be the system binaries (hook-less)
     meson = cleanMeson;
     ninja = cleanNinja;
 
-    # FIX: meson-python checks for 'meson' python package.
-    # We patch it to REMOVE that check so we can just provide the binary.
+    # FIX: Patch meson-python to ignore 'meson' python dependency.
+    # We provide the binary/module via nativeBuildInputs.
     meson-python = prev.meson-python.overridePythonAttrs (old: {
-      # Remove 'meson' from pyproject.toml dependencies to bypass pip check
       postPatch = (old.postPatch or "") + ''
         sed -i 's/"meson.*",//g' pyproject.toml
         sed -i "s/'meson.*',//g" pyproject.toml
       '';
-      # Provide the binary
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ cleanMeson ];
+    });
+
+    # FIX: Patch pybind11 to ignore 'ninja' python dependency.
+    # We provide the binary via nativeBuildInputs.
+    pybind11 = prev.pybind11.overridePythonAttrs (old: {
+      postPatch = (old.postPatch or "") + ''
+        sed -i 's/"ninja.*",//g' pyproject.toml
+        sed -i "s/'ninja.*',//g" pyproject.toml
+      '';
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ cleanNinja ];
     });
 
     # FIX: Scipy 1.15.3 requires newer meson.
@@ -55,7 +57,6 @@ let
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
       
-      # FIX: macOS gfortran linking issues. Explicitly add libgfortran.
       buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.gfortran.cc.lib 
       ];
