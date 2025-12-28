@@ -14,27 +14,29 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0) than in stable.
+    # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
+    # We avoid adding meson/ninja to any inputs to prevent their setup hooks 
+    # from firing. Instead, we manually inject them into PATH.
     scipy = prev.scipy.overridePythonAttrs (old: {
-      # Use depsBuildBuild to put tools in PATH without triggering incompatible setup hooks
-      depsBuildBuild = (old.depsBuildBuild or []) ++ [
-        unstable.meson
-        unstable.ninja
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
         unstable.pkg-config
         unstable.gfortran
-      ];
-
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+      ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
 
-      # Disable Nix's automatic meson configure phase to let pip handle it
+      # Manually inject unstable meson and ninja into PATH.
+      # This bypasses incompatible setup hooks while providing the tools.
+      preConfigure = ''
+        export PATH="${unstable.meson}/bin:${unstable.ninja}/bin:$PATH"
+      '';
+
+      # Disable Nix's automatic meson configure phase.
       configurePhase = "true";
     });
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
-        # Fetch dependencies using the unstable fetcher (required for v4 lockfiles)
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
@@ -50,24 +52,22 @@ let
 
         srcCargoDeps = rustDeps;
         
-        # Disable automatic Rust hooks to prevent version conflicts.
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           unstable.cargo
           unstable.rustc
-          unstable.maturin      # Use binary directly
-          pkgs.python311Packages.pip # Needed for install phase
-          pkgs.pkg-config       # Helper for finding system libs
-        ];
-
-        # Add macOS-specific system libraries required for linking
-        buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+          unstable.maturin
+          pkgs.python311Packages.pip
+          pkgs.pkg-config
+        ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
           pkgs.libiconv
           pkgs.darwin.apple_sdk.frameworks.Security
           pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
         ];
 
-        # FIX: Manual Unpack
-        # poetry2nix mistakenly treats the tarball as a wheel, creating empty dirs.
+        buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+          pkgs.libiconv
+        ];
+
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
@@ -77,8 +77,6 @@ let
           export sourceRoot="$srcDir"
         '';
 
-        # FIX: Manual Configure (Vendor setup)
-        # Bypasses cargoSetupHook validation logic
         preConfigure = ''
           echo ">>> Manual Cargo Config"
           mkdir -p .cargo
@@ -91,44 +89,31 @@ let
           EOF
           export CARGO_HOME=$(pwd)/.cargo
           
-          # MacOS Fix: Explicitly point to libiconv using Nix string interpolation
           ${pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
              export RUSTFLAGS="-L ${pkgs.libiconv}/lib -l iconv"
           ''}
         '';
 
-        # FIX: Manual Build using Maturin directly
-        # Bypasses maturinBuildHook which was using the wrong (stable) Cargo version
         buildPhase = ''
           echo ">>> Manual BuildPhase with Maturin"
-          # Ensure we use the unstable cargo
           export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
-          
-          # Run maturin manually. 
-          # -i python tells it which python interpreter to build for
           maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
         '';
 
-        # FIX: Manual Install & Satisfy poetry2nix dist expectations
         installPhase = ''
           echo ">>> Manual InstallPhase"
           mkdir -p $out
-          
-          # Find the built wheel
           wheel=$(find target/wheels -name "*.whl" | head -n 1)
           if [ -z "$wheel" ]; then echo "❌ Error: No wheel found"; exit 1; fi
           
           echo ">>> Installing $wheel"
           pip install --no-deps --prefix=$out "$wheel"
           
-          # CRITICAL FIX: poetry2nix's pythonOutputDistPhase expects the built artifacts in ./dist
-          # If we don't put them there, the build fails after installation.
           echo ">>> Copying wheel to ./dist for poetry2nix compliance"
           mkdir -p dist
           cp "$wheel" dist/
         '';
 
-        # Disable all automatic phases we replaced
         wheelUnpackPhase = "true"; 
     });
 
@@ -155,5 +140,4 @@ let
   } else {};
 
 in
-  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
