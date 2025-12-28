@@ -14,9 +14,11 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Use pre-built scipy from unstable to avoid toolchain/build hell.
-    # This bypasses the need to build scipy 1.15.3 from source with mismatched meson versions.
-    scipy = unstable.python311Packages.scipy;
+    # FIX: Try to use wheels for Scipy to avoid complex build chain issues (Meson/Ninja version mismatch).
+    scipy = prev.scipy.overridePythonAttrs (old: {
+      preferWheel = true;
+      # Allow autoPatchelfHook (if present in environment) to fix up the wheel libs
+    });
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
