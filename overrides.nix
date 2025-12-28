@@ -6,10 +6,12 @@ let
   # ---------------------------------------------------------------------------
   # We use the full derivation from unstable, but strip setupHook.
   # This ensures it has the python metadata (for pip) and the binary (for PATH).
+  # unstable.meson is built with buildPythonApplication.
   cleanMeson = unstable.meson.overrideAttrs (old: {
     setupHook = null;
   });
   
+  # Ninja is a python package wrapping the binary.
   cleanNinja = unstable.ninja.overrideAttrs (old: {
     setupHook = null;
   });
@@ -24,42 +26,24 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Replace the 'meson' Python package with the one from unstable.
-    # This provides version 1.6.0+, valid python metadata, and the binary.
-    # We stripped the hook to prevent Linux crashes.
+    # FIX: Override 'meson' in the python set to be the clean unstable version.
+    # This ensures pip sees it as a valid package.
     meson = cleanMeson;
 
-    # FIX: Replace 'ninja' Python package with a dummy that provides the binary.
-    # The real ninja python package tries to build from source and fails.
-    # We satisfy the dependency check with a dummy and provide the binary.
-    ninja = prev.ninja.overridePythonAttrs (old: {
-      format = "other";
-      buildCommand = ''
-        mkdir -p $out/bin
-        ln -s ${cleanNinja}/bin/ninja $out/bin/ninja
-        
-        # Fake metadata for pip
-        site_packages=$out/lib/python3.11/site-packages
-        mkdir -p $site_packages/ninja-${unstable.ninja.version}.dist-info
-        echo "Metadata-Version: 2.1" > $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
-        echo "Name: ninja" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
-        echo "Version: ${unstable.ninja.version}" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
-      '';
-      propagatedBuildInputs = [ cleanNinja ];
-    });
+    # FIX: Override 'ninja' in the python set.
+    ninja = cleanNinja;
 
-    # FIX: meson-python needs meson available. Ensure it uses our overridden one.
+    # FIX: meson-python needs meson available. 
+    # Use our overridden 'meson' from 'final' to ensure consistency.
     meson-python = prev.meson-python.overridePythonAttrs (old: {
-      # We explicitly add our clean meson to build inputs.
-      # We also filter out any old meson to be safe.
-      buildInputs = (pkgs.lib.filter (p: (p.pname or "") != "meson") (old.buildInputs or [])) ++ [ final.meson ];
-      nativeBuildInputs = (pkgs.lib.filter (p: (p.pname or "") != "meson") (old.nativeBuildInputs or [])) ++ [ final.meson ];
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
     });
 
     # FIX: Scipy 1.15.3 requires newer meson.
     scipy = prev.scipy.overridePythonAttrs (old: {
-      # 1. Filter out existing meson/ninja (likely stable ones added by poetry2nix)
+      # 1. Filter out existing meson/ninja
       # 2. Add our clean/unstable versions.
+      # 3. Use STABLE gfortran to avoid macOS linking issues with unstable compiler.
       nativeBuildInputs = (pkgs.lib.filter 
         (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
         (old.nativeBuildInputs or [])) 
@@ -67,7 +51,7 @@ let
         final.meson 
         final.ninja
         unstable.pkg-config
-        unstable.gfortran
+        pkgs.gfortran # Use STABLE gfortran
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
