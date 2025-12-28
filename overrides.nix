@@ -15,23 +15,20 @@ let
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
     # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0) than in stable.
-    # We avoid adding meson/ninja as packages to nativeBuildInputs to prevent their 
-    # setup hooks from firing and failing (missing flags, missing concatTo).
-    # Instead, we manually add their binaries to the PATH.
     scipy = prev.scipy.overridePythonAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+      # Use depsBuildBuild to put tools in PATH without triggering incompatible setup hooks
+      depsBuildBuild = (old.depsBuildBuild or []) ++ [
+        unstable.meson
+        unstable.ninja
         unstable.pkg-config
         unstable.gfortran
-      ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+      ];
+
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
 
-      # Manually inject unstable meson and ninja into PATH.
-      preConfigure = ''
-        export PATH="${unstable.meson}/bin:${unstable.ninja}/bin:$PATH"
-      '';
-
-      # Disable Nix's automatic meson configure phase.
+      # Disable Nix's automatic meson configure phase to let pip handle it
       configurePhase = "true";
     });
 
