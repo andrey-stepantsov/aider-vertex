@@ -12,6 +12,13 @@ let
     setupHook = null;
   });
 
+  # Helper to inject concatTo if any stray hooks still run
+  concatToShim = pkgs.runCommand "concatTo-shim" {} ''
+    mkdir -p $out/nix-support
+    echo "concatTo() { local target=\"\$1\"; shift; cat \"\$@\" >> \"\$target\"; }" > $out/nix-support/setup-hook
+    echo "export -f concatTo" >> $out/nix-support/setup-hook
+  '';
+
   common = {
     google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
     google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
@@ -22,34 +29,9 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Update meson Python package to unstable version (1.5+) for Scipy.
-    # We strip setupHook to prevent "concatTo not found" errors in stable stdenv.
-    meson = prev.meson.overridePythonAttrs (old: {
-      version = unstable.meson.version;
-      src = unstable.meson.src;
-      patches = [];
-      setupHook = null;
-    });
-
-    # FIX: Replace ninja Python package with system binary wrapper.
-    # Prevents "pyproject.toml not found" errors and provides the binary for build systems.
-    ninja = prev.ninja.overridePythonAttrs (old: {
-      # Don't try to build from source
-      format = "other";
-      # Manually link the binary and create metadata
-      buildCommand = ''
-        mkdir -p $out/bin
-        ln -s ${unstable.ninja}/bin/ninja $out/bin/ninja
-        
-        # Create dummy dist-info so pip thinks it's installed
-        site_packages=$out/lib/python3.11/site-packages
-        mkdir -p $site_packages/ninja-1.11.1.dist-info
-        echo "Metadata-Version: 2.1" > $site_packages/ninja-1.11.1.dist-info/METADATA
-        echo "Name: ninja" >> $site_packages/ninja-1.11.1.dist-info/METADATA
-        echo "Version: 1.11.1" >> $site_packages/ninja-1.11.1.dist-info/METADATA
-      '';
-      propagatedBuildInputs = [ unstable.ninja ];
-    });
+    # FIX: Override the Python packages 'meson' and 'ninja' to be the system tools.
+    meson = cleanMeson;
+    ninja = cleanNinja;
 
     # FIX: meson-python needs meson available at build time
     meson-python = prev.meson-python.overridePythonAttrs (old: {
@@ -58,12 +40,18 @@ let
 
     # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
     scipy = prev.scipy.overridePythonAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        final.meson 
-        final.ninja
+      # 1. Filter out existing meson/ninja (likely stable ones added by poetry2nix)
+      # 2. Prepend our clean/unstable versions and the shim.
+      nativeBuildInputs = [
+        concatToShim # Must be first to define the function for any subsequent hooks
+        cleanMeson 
+        cleanNinja
         unstable.pkg-config
         unstable.gfortran
-      ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+      ] ++ (pkgs.lib.filter 
+        (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
+        (old.nativeBuildInputs or []))
+      ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
       
@@ -71,7 +59,6 @@ let
       configurePhase = "true"; 
     });
 
-    # ... rpds-py override ...
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
