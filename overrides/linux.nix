@@ -74,7 +74,7 @@ in {
     propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
   });
 
-  # FIXED RPDS-PY: Remove crashing hook, manual build only
+  # FIXED RPDS-PY: Manual cargo config to enable offline build
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
       rustDeps = unstable.rustPlatform.fetchCargoVendor {
@@ -90,18 +90,28 @@ in {
         version = "0.22.3";
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
-      cargoDeps = rustDeps;
-      # CRITICAL: Do NOT include maturinBuildHook, it crashes stable stdenv!
+      srcCargoDeps = rustDeps; # Used by our manual preConfigure
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
         unstable.cargo unstable.rustc unstable.maturin pkgs.pkg-config
       ];
       
-      # Manual unpack to flatten directory structure
       unpackPhase = ''
         tar -xf $src --strip-components=1
       '';
       
-      # Manual build since hook is gone
+      # Manually point cargo to vendored sources
+      preConfigure = ''
+        mkdir -p .cargo
+        cat > .cargo/config.toml <<EOF
+        [source.crates-io]
+        replace-with = "vendored-sources"
+
+        [source.vendored-sources]
+        directory = "$srcCargoDeps"
+        EOF
+        export CARGO_HOME=$(pwd)/.cargo
+      '';
+
       buildPhase = ''
         export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
         maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3

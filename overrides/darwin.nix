@@ -1,7 +1,7 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 {
-  # ... Google overrides ...
+  # ... (Google overrides same) ...
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
   google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -25,23 +25,22 @@ final: prev:
       unstable.gfortran
     ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     
-    # Try adding the specific lib path for link time
     buildInputs = (old.buildInputs or []) ++ [ unstable.gfortran.cc.lib ];
     
-    # Inject LDFLAGS for both meson env and linker
+    # FIX: Aggressive linker flags for macOS Fortran
     preConfigure = (old.preConfigure or "") + ''
       export FC=${unstable.gfortran}/bin/gfortran
-      export LIBRARY_PATH="${unstable.gfortran.cc.lib}/lib:$LIBRARY_PATH"
+      export MACOSX_DEPLOYMENT_TARGET=11.0
+      export DYLD_LIBRARY_PATH="${unstable.gfortran.cc.lib}/lib:$DYLD_LIBRARY_PATH"
+      export DYLD_FALLBACK_LIBRARY_PATH="${unstable.gfortran.cc.lib}/lib:$DYLD_FALLBACK_LIBRARY_PATH"
       export LDFLAGS="-L${unstable.gfortran.cc.lib}/lib -Wl,-rpath,${unstable.gfortran.cc.lib}/lib $LDFLAGS"
-      # Meson specific env vars
-      export FFLAGS="$LDFLAGS"
     '';
 
     preferWheel = true;
     configurePhase = "true"; 
   });
 
-  # Rpds-py override for Darwin (unchanged, it works)
+  # Rpds-py for Darwin (Standard working config)
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
       rustDeps = unstable.rustPlatform.fetchCargoVendor {
