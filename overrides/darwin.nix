@@ -1,7 +1,7 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 {
-  # Standard Google Fixes
+  # ... (Google overrides same) ...
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
   google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -11,7 +11,6 @@ final: prev:
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Use Unstable tools (macOS handles them fine)
   meson = unstable.meson;
   ninja = unstable.ninja;
 
@@ -23,15 +22,13 @@ final: prev:
       unstable.meson 
       unstable.ninja
       unstable.pkg-config
-      pkgs.gfortran # Use STABLE Gfortran to match system libs
+      pkgs.gfortran
     ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     
-    # Link against STABLE libraries
     buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
     
     preConfigure = (old.preConfigure or "") + ''
       export FC=${pkgs.gfortran}/bin/gfortran
-      # Aggressive Linking to find libgfortran
       export DYLD_LIBRARY_PATH="${pkgs.gfortran.cc.lib}/lib:$DYLD_LIBRARY_PATH"
       export DYLD_FALLBACK_LIBRARY_PATH="${pkgs.gfortran.cc.lib}/lib:$DYLD_FALLBACK_LIBRARY_PATH"
       export LDFLAGS="-L${pkgs.gfortran.cc.lib}/lib -Wl,-rpath,${pkgs.gfortran.cc.lib}/lib $LDFLAGS"
@@ -41,13 +38,15 @@ final: prev:
     configurePhase = "true"; 
   });
 
-  # Use old-school override with STABLE Rust to avoid Python version mismatch
+  # Rpds-py for Darwin (Stable Rust = fetchCargoTarball)
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
-      rustDeps = pkgs.rustPlatform.fetchCargoVendor {
+      # Use fetchCargoTarball for stable nixpkgs
+      rustDeps = pkgs.rustPlatform.fetchCargoTarball {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
-        hash = "sha256-2skrDC80g0EKvTEeBI4t4LD7ZXb6jp2Gw+owKFrkZzc=";
+        # Hash for fetchCargoTarball (different from fetchCargoVendor!)
+        hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
       };
     in {
       preferWheel = false; 
@@ -57,7 +56,7 @@ final: prev:
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
       cargoDeps = rustDeps;
-      # Using STABLE Rust/Maturin
+      
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
         pkgs.cargo pkgs.rustc pkgs.maturin pkgs.python311Packages.pip pkgs.pkg-config
         pkgs.libiconv pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
