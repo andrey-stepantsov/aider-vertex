@@ -14,15 +14,34 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Try to use wheels for Scipy to avoid complex build chain issues (Meson/Ninja version mismatch).
+    # FIX: Upgrade meson in the python set to unstable (>=1.5.0) for Scipy
+    meson = prev.meson.overridePythonAttrs (old: {
+      src = unstable.meson.src;
+      version = unstable.meson.version;
+      # Meson setup hooks are incompatible with stable stdenv, disable them
+      setupHook = null;
+    });
+
+    # FIX: Scipy 1.15.3 requires newer meson.
     scipy = prev.scipy.overridePythonAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+        final.meson # Use our overridden meson
+        unstable.ninja
+        unstable.pkg-config
+        unstable.gfortran
+      ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+        pkgs.darwin.apple_sdk.frameworks.Accelerate
+      ];
+      
+      # Try to use wheel first
       preferWheel = true;
-      # Allow autoPatchelfHook (if present in environment) to fix up the wheel libs
+      
+      # Disable Nix's automatic meson configure phase.
+      configurePhase = "true";
     });
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
-        # Fetch dependencies using the unstable fetcher (required for v4 lockfiles)
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
@@ -38,24 +57,22 @@ let
 
         srcCargoDeps = rustDeps;
         
-        # Disable automatic Rust hooks to prevent version conflicts.
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           unstable.cargo
           unstable.rustc
-          unstable.maturin      # Use binary directly
-          pkgs.python311Packages.pip # Needed for install phase
-          pkgs.pkg-config       # Helper for finding system libs
-        ];
-
-        # Add macOS-specific system libraries required for linking
-        buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+          unstable.maturin
+          pkgs.python311Packages.pip
+          pkgs.pkg-config
+        ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
           pkgs.libiconv
           pkgs.darwin.apple_sdk.frameworks.Security
           pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
         ];
 
-        # FIX: Manual Unpack
-        # poetry2nix mistakenly treats the tarball as a wheel, creating empty dirs.
+        buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+          pkgs.libiconv
+        ];
+
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
@@ -65,8 +82,6 @@ let
           export sourceRoot="$srcDir"
         '';
 
-        # FIX: Manual Configure (Vendor setup)
-        # Bypasses cargoSetupHook validation logic
         preConfigure = ''
           echo ">>> Manual Cargo Config"
           mkdir -p .cargo
@@ -79,40 +94,31 @@ let
           EOF
           export CARGO_HOME=$(pwd)/.cargo
           
-          # MacOS Fix: Explicitly point to libiconv using Nix string interpolation
           ${pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
              export RUSTFLAGS="-L ${pkgs.libiconv}/lib -l iconv"
           ''}
         '';
 
-        # FIX: Manual Build using Maturin directly
-        # Bypasses maturinBuildHook which was using the wrong (stable) Cargo version
         buildPhase = ''
           echo ">>> Manual BuildPhase with Maturin"
           export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
           maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
         '';
 
-        # FIX: Manual Install & Satisfy poetry2nix dist expectations
         installPhase = ''
           echo ">>> Manual InstallPhase"
           mkdir -p $out
-          
-          # Find the built wheel
           wheel=$(find target/wheels -name "*.whl" | head -n 1)
           if [ -z "$wheel" ]; then echo "❌ Error: No wheel found"; exit 1; fi
           
           echo ">>> Installing $wheel"
           pip install --no-deps --prefix=$out "$wheel"
           
-          # CRITICAL FIX: poetry2nix's pythonOutputDistPhase expects the built artifacts in ./dist
-          # If we don't put them there, the build fails after installation.
           echo ">>> Copying wheel to ./dist for poetry2nix compliance"
           mkdir -p dist
           cp "$wheel" dist/
         '';
 
-        # Disable all automatic phases we replaced
         wheelUnpackPhase = "true"; 
     });
 
