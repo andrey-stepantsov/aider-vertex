@@ -4,7 +4,6 @@ let
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in {
-  # ... (Google overrides same) ...
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
   google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -75,15 +74,17 @@ in {
     propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
   });
 
-  # FIXED RPDS-PY: Graft unstable source/deps into stable build
+  # GRAFTED RPDS-PY
+  # We must explicitly set format = "pyproject" to stop poetry2nix from treating this as a wheel
   rpds-py = prev.rpds-py.overridePythonAttrs (old: {
+    format = "pyproject";
     inherit (unstable.python311Packages.rpds-py) src cargoDeps;
-    
-    # Ensure we use STABLE hooks/tools
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-      pkgs.cargo pkgs.rustc pkgs.rustPlatform.maturinBuildHook pkgs.pkg-config
+      pkgs.cargo 
+      pkgs.rustc 
+      pkgs.rustPlatform.cargoSetupHook # Essential for unpacking cargoDeps
+      pkgs.rustPlatform.maturinBuildHook 
+      pkgs.pkg-config
     ];
-    
-    # We rely on maturinBuildHook now, so no manual phases needed IF cargoDeps matches
   });
 }

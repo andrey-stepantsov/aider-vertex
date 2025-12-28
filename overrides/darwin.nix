@@ -1,7 +1,6 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 {
-  # ... (Google overrides same) ...
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
   google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -11,6 +10,7 @@ final: prev:
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
+  # macOS can handle unstable tools without dummy packages
   meson = unstable.meson;
   ninja = unstable.ninja;
 
@@ -22,11 +22,12 @@ final: prev:
       unstable.meson 
       unstable.ninja
       unstable.pkg-config
-      pkgs.gfortran
+      pkgs.gfortran # Use STABLE gfortran
     ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     
     buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
     
+    # Aggressive Linking to find Stable libgfortran
     preConfigure = (old.preConfigure or "") + ''
       export FC=${pkgs.gfortran}/bin/gfortran
       export DYLD_LIBRARY_PATH="${pkgs.gfortran.cc.lib}/lib:$DYLD_LIBRARY_PATH"
@@ -38,12 +39,16 @@ final: prev:
     configurePhase = "true"; 
   });
 
-  # GRAFTED RPDS-PY: Use unstable source/deps with stable build environment
+  # GRAFTED RPDS-PY for Darwin
   rpds-py = prev.rpds-py.overridePythonAttrs (old: {
+    format = "pyproject";
     inherit (unstable.python311Packages.rpds-py) src cargoDeps;
-    
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-      pkgs.cargo pkgs.rustc pkgs.rustPlatform.maturinBuildHook pkgs.pkg-config
+      pkgs.cargo 
+      pkgs.rustc 
+      pkgs.rustPlatform.cargoSetupHook 
+      pkgs.rustPlatform.maturinBuildHook 
+      pkgs.pkg-config
       pkgs.libiconv pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
     ];
     buildInputs = (old.buildInputs or []) ++ [ pkgs.libiconv ];
