@@ -4,7 +4,7 @@ let
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in {
-  # ... (Google overrides same as before) ...
+  # ... Google overrides ...
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
   google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -14,6 +14,7 @@ in {
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
+  # Dummy tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -74,7 +75,7 @@ in {
     propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
   });
 
-  # FIXED RPDS-PY: Standard hooks + manual sourceRoot
+  # FIXED RPDS-PY: Manual build to bypass crashing maturinBuildHook
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
       rustDeps = unstable.rustPlatform.fetchCargoVendor {
@@ -84,7 +85,6 @@ in {
       };
     in {
       preferWheel = false; 
-      format = "pyproject";
       src = pkgs.fetchPypi {
         pname = "rpds_py";
         version = "0.22.3";
@@ -92,15 +92,29 @@ in {
       };
       cargoDeps = rustDeps;
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        unstable.cargo unstable.rustc unstable.maturin unstable.rustPlatform.maturinBuildHook pkgs.pkg-config
+        unstable.cargo unstable.rustc unstable.maturin pkgs.pkg-config
       ];
-      # Standard tarball from PyPI for rpds_py usually unpacks to this:
-      sourceRoot = "rpds_py-0.22.3";
       
-      # Clear manual phases
-      unpackPhase = null;
-      buildPhase = null;
-      installPhase = null;
+      # Flatten the source so we are always in the right dir
+      unpackPhase = ''
+        tar -xf $src --strip-components=1
+      '';
+      
+      # Manual build to avoid maturin hook crashing on 'concatTo'
+      buildPhase = ''
+        export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
+        # We assume we are in the source root because of unpackPhase
+        maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
+      '';
+      
+      installPhase = ''
+        mkdir -p $out
+        wheel=$(find target/wheels -name "*.whl" | head -n 1)
+        pip install --no-deps --prefix=$out "$wheel"
+        mkdir -p dist && cp "$wheel" dist/
+      '';
+      
+      # Disable wheel hook since we are building manually
       wheelUnpackPhase = null;
   });
 }
