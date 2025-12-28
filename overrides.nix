@@ -23,13 +23,12 @@ let
         unstable.pkg-config
         unstable.gfortran
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-        # Use stable frameworks to avoid "apple_sdk_11_0 removed" errors in unstable
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
 
-      # SHIM: Define concatTo for unstable hooks running in stable stdenv
-      # This fixes "concatTo: command not found" errors in buildPhase
-      postPatch = (old.postPatch or "") + ''
+      # SHIM: Define concatTo in preHook so it exists BEFORE unstable hooks run.
+      # This fixes "concatTo: command not found" errors during env setup.
+      preHook = ''
         concatTo() {
           local target="$1"
           shift
