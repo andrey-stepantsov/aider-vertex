@@ -1,11 +1,10 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # Strip hooks from unstable tools to prevent Linux crashes (concatTo error)
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in {
-  # Standard Google Fixes
+  # ... Google overrides ...
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
   google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -15,7 +14,6 @@ in {
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # 1. Dummy Meson (Linux specific hack)
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -35,7 +33,6 @@ in {
     propagatedBuildInputs = [ cleanMesonBinary ];
   };
 
-  # 2. Dummy Ninja (Linux specific hack)
   ninja = pkgs.python311Packages.buildPythonPackage {
     pname = "ninja";
     version = unstable.ninja.version;
@@ -77,55 +74,33 @@ in {
     propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
   });
 
-  # FIXED RPDS-PY: Manual Build with Pip
+  # FIXED RPDS-PY: Use STABLE Rust Platform (avoids concatTo crash & python mismatch)
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
-      rustDeps = unstable.rustPlatform.fetchCargoVendor {
+      # Use fetchCargoTarball (Stable API)
+      rustDeps = pkgs.rustPlatform.fetchCargoTarball {
         inherit (final.rpds-py) src;
         name = "rpds-py-vendor";
-        hash = "sha256-2skrDC80g0EKvTEeBI4t4LD7ZXb6jp2Gw+owKFrkZzc=";
+        hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
       };
     in {
       preferWheel = false; 
-      format = "pyproject";
       src = pkgs.fetchPypi {
         pname = "rpds_py";
         version = "0.22.3";
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
       cargoDeps = rustDeps;
-      # Includes pip and python3 explicitly
+      
+      # Use STABLE hooks. They shouldn't crash.
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        unstable.cargo unstable.rustc unstable.maturin pkgs.pkg-config pkgs.python311Packages.pip pkgs.python3
+        pkgs.cargo pkgs.rustc pkgs.rustPlatform.maturinBuildHook pkgs.pkg-config
       ];
       
-      unpackPhase = ''
-        tar -xf $src --strip-components=1
-      '';
-      
-      preConfigure = ''
-        mkdir -p .cargo
-        cat > .cargo/config.toml <<EOF
-        [source.crates-io]
-        replace-with = "vendored-sources"
-        [source.vendored-sources]
-        directory = "$srcCargoDeps"
-        EOF
-        export CARGO_HOME=$(pwd)/.cargo
-      '';
-
-      buildPhase = ''
-        export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
-        maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
-      '';
-      
-      installPhase = ''
-        mkdir -p $out
-        wheel=$(find target/wheels -name "*.whl" | head -n 1)
-        python3 -m pip install --no-deps --prefix=$out "$wheel"
-        mkdir -p dist && cp "$wheel" dist/
-      '';
-      
+      # Clean up manual phases since we trust stable hooks
+      unpackPhase = null;
+      buildPhase = null;
+      installPhase = null;
       wheelUnpackPhase = null;
   });
 }
