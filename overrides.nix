@@ -1,6 +1,22 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
+  # ---------------------------------------------------------------------------
+  # Helper: Clean unstable tools without their hooks
+  # ---------------------------------------------------------------------------
+  # We need the binaries from unstable for Scipy 1.15.3, but we must strip their
+  # setup hooks. The hooks cause failures (missing 'concatTo', expecting 'ninjaFlags')
+  # when running in the stable stdenv or when we bypass standard phases.
+  # We use these to replace the Python packages 'meson' and 'ninja' that poetry2nix
+  # would otherwise try to build from source (and fail).
+  cleanMeson = unstable.meson.overrideAttrs (old: {
+    setupHook = null;
+  });
+  
+  cleanNinja = unstable.ninja.overrideAttrs (old: {
+    setupHook = null;
+  });
+
   common = {
     google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
     google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
@@ -11,28 +27,27 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # Override meson globally to unstable version, strip hooks.
-    meson = prev.meson.overrideAttrs (old: {
-      src = unstable.meson.src;
-      version = unstable.meson.version;
-      patches = [];
-      setupHook = null;
-    });
+    # FIX: Override the Python packages 'meson' and 'ninja' to be the system tools.
+    # This prevents poetry2nix from trying to build them from source (which fails)
+    # and ensures `scipy` uses these updated, clean binaries.
+    # By using 'overridePythonAttrs', we replace the derivation poetry2nix generated.
+    # We replace it with our clean system tool derivation.
+    meson = cleanMeson;
+    ninja = cleanNinja;
 
-    # Override ninja globally, strip hooks.
-    ninja = prev.ninja.overrideAttrs (old: {
-      src = unstable.ninja.src;
-      version = unstable.ninja.version;
-      setupHook = null;
-    });
-
-    # Fix meson-python missing dependency
+    # FIX: meson-python needs meson available at build time
     meson-python = prev.meson-python.overridePythonAttrs (old: {
-      buildInputs = (old.buildInputs or []) ++ [ final.meson ];
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
     });
 
+    # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
     scipy = prev.scipy.overridePythonAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+      # Explicitly use our overridden (unstable, clean) meson and ninja.
+      # We filter out any old ones that might be pulled in transitively to be safe.
+      nativeBuildInputs = (pkgs.lib.filter 
+        (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
+        (old.nativeBuildInputs or [])) 
+      ++ [
         final.meson 
         final.ninja
         unstable.pkg-config
@@ -40,10 +55,12 @@ let
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
+      
       preferWheel = true;
       configurePhase = "true"; 
     });
 
+    # ... rpds-py override ...
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
