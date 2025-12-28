@@ -4,7 +4,7 @@ let
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in {
-  # ... Google overrides ...
+  # ... (Google overrides same as before) ...
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
   google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -14,7 +14,6 @@ in {
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -75,7 +74,7 @@ in {
     propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
   });
 
-  # FIXED RPDS-PY: Robust source handling
+  # FIXED RPDS-PY: Standard hooks + manual sourceRoot
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
       rustDeps = unstable.rustPlatform.fetchCargoVendor {
@@ -95,31 +94,13 @@ in {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
         unstable.cargo unstable.rustc unstable.maturin unstable.rustPlatform.maturinBuildHook pkgs.pkg-config
       ];
+      # Standard tarball from PyPI for rpds_py usually unpacks to this:
+      sourceRoot = "rpds_py-0.22.3";
       
-      # FORCE sourceRoot to a known value by moving extracted files
-      unpackPhase = ''
-        tar -xf $src
-        # Find the directory starting with rpds_py
-        dir=$(find . -maxdepth 1 -type d -name "rpds_py*" | head -n 1)
-        # Move it to a fixed name
-        mv "$dir" source
-      '';
-      sourceRoot = "source";
-      
-      # We don't need manual buildPhase now, maturinBuildHook should work if source is correct.
-      # But to be safe, let's keep the manual one that worked before, adapted.
-      buildPhase = ''
-        export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
-        maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
-      '';
-      
-      installPhase = ''
-        mkdir -p $out
-        wheel=$(find target/wheels -name "*.whl" | head -n 1)
-        pip install --no-deps --prefix=$out "$wheel"
-        mkdir -p dist && cp "$wheel" dist/
-      '';
-      
-      wheelUnpackPhase = "true"; 
+      # Clear manual phases
+      unpackPhase = null;
+      buildPhase = null;
+      installPhase = null;
+      wheelUnpackPhase = null;
   });
 }
