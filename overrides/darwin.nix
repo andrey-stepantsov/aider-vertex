@@ -25,13 +25,16 @@ final: prev:
       unstable.gfortran
     ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     
+    # Try adding the specific lib path for link time
     buildInputs = (old.buildInputs or []) ++ [ unstable.gfortran.cc.lib ];
     
-    # FIX: Use DYLD_LIBRARY_PATH to help the test executable find libgfortran
+    # Inject LDFLAGS for both meson env and linker
     preConfigure = (old.preConfigure or "") + ''
       export FC=${unstable.gfortran}/bin/gfortran
-      export DYLD_LIBRARY_PATH="${unstable.gfortran.cc.lib}/lib:$DYLD_LIBRARY_PATH"
+      export LIBRARY_PATH="${unstable.gfortran.cc.lib}/lib:$LIBRARY_PATH"
       export LDFLAGS="-L${unstable.gfortran.cc.lib}/lib -Wl,-rpath,${unstable.gfortran.cc.lib}/lib $LDFLAGS"
+      # Meson specific env vars
+      export FFLAGS="$LDFLAGS"
     '';
 
     preferWheel = true;
