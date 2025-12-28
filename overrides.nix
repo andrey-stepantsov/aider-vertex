@@ -4,11 +4,11 @@ let
   # ---------------------------------------------------------------------------
   # Helper: Clean unstable tools without their hooks
   # ---------------------------------------------------------------------------
-  cleanMeson = unstable.meson.overrideAttrs (old: {
+  cleanMesonBinary = unstable.meson.overrideAttrs (old: {
     setupHook = null;
   });
   
-  cleanNinja = unstable.ninja.overrideAttrs (old: {
+  cleanNinjaBinary = unstable.ninja.overrideAttrs (old: {
     setupHook = null;
   });
 
@@ -22,27 +22,55 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Override 'meson' Python package.
-    meson = cleanMeson;
-
-    # FIX: Override 'ninja' Python package.
-    ninja = prev.ninja.overridePythonAttrs (old: {
+    # FIX: Override 'meson' Python package using buildPythonPackage "other" format.
+    # This ensures poetry2nix treats it as a first-class python package, satisfying pip.
+    meson = pkgs.python311Packages.buildPythonPackage {
+      pname = "meson";
+      version = unstable.meson.version;
       format = "other";
-      buildCommand = ''
+      src = ./.; # Dummy src
+      unpackPhase = "true";
+      installPhase = ''
         mkdir -p $out/bin
-        ln -s ${cleanNinja}/bin/ninja $out/bin/ninja
+        ln -s ${cleanMesonBinary}/bin/meson $out/bin/meson
+        
+        site_packages=$out/lib/python3.11/site-packages
+        mkdir -p $site_packages/meson-${unstable.meson.version}.dist-info
+        echo "Metadata-Version: 2.1" > $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
+        echo "Name: meson" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
+        echo "Version: ${unstable.meson.version}" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
+        
+        # Link the module so imports work
+        ln -s ${cleanMesonBinary}/lib/python*/site-packages/mesonbuild $site_packages/mesonbuild
+      '';
+      propagatedBuildInputs = [ cleanMesonBinary ];
+    };
+
+    # FIX: Override 'ninja' Python package similarly.
+    ninja = pkgs.python311Packages.buildPythonPackage {
+      pname = "ninja";
+      version = unstable.ninja.version;
+      format = "other";
+      src = ./.; # Dummy src
+      unpackPhase = "true";
+      installPhase = ''
+        mkdir -p $out/bin
+        ln -s ${cleanNinjaBinary}/bin/ninja $out/bin/ninja
+        
         site_packages=$out/lib/python3.11/site-packages
         mkdir -p $site_packages/ninja-${unstable.ninja.version}.dist-info
         echo "Metadata-Version: 2.1" > $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
         echo "Name: ninja" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
         echo "Version: ${unstable.ninja.version}" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
       '';
-      propagatedBuildInputs = [ cleanNinja ];
-    });
+      propagatedBuildInputs = [ cleanNinjaBinary ];
+    };
 
-    # FIX: meson-python needs meson available
+    # FIX: meson-python needs meson.
     meson-python = prev.meson-python.overridePythonAttrs (old: {
+      # Add our dummy packages to build inputs
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
+      propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
     });
 
     # FIX: Scipy 1.15.3 requires newer meson.
@@ -54,14 +82,10 @@ let
         final.meson 
         final.ninja
         unstable.pkg-config
-        pkgs.gfortran
+        pkgs.gfortran # Use STABLE gfortran
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
-      
-      # FIX: Ensure libgfortran is available at runtime/link-time to fix
-      # "Executables created by fortran compiler gfortran are not runnable"
-      buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
       
       preferWheel = true;
       configurePhase = "true"; 
