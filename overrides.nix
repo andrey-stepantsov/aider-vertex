@@ -2,23 +2,25 @@
 final: prev:
 let
   # ---------------------------------------------------------------------------
-  # Helper: Clean unstable tools without their hooks
+  # Helper: Sanitized Build Tools
   # ---------------------------------------------------------------------------
-  cleanMeson = unstable.meson.overrideAttrs (old: {
-    setupHook = null;
-  });
+  # We create fresh packages that ONLY contain the binaries (via symlink).
+  # This strips 100% of Nix setup hooks, environment variables, and metadata.
+  # This guarantees no "concatTo: command not found" or "ninjaFlags" errors.
   
-  cleanNinja = unstable.ninja.overrideAttrs (old: {
-    setupHook = null;
-  });
-
-  # Helper to inject concatTo if any stray hooks still run
-  concatToShim = pkgs.runCommand "concatTo-shim" {} ''
-    mkdir -p $out/nix-support
-    echo "concatTo() { local target=\"\$1\"; shift; cat \"\$@\" >> \"\$target\"; }" > $out/nix-support/setup-hook
-    echo "export -f concatTo" >> $out/nix-support/setup-hook
+  cleanMesonBinary = pkgs.runCommand "clean-meson-1.6" {} ''
+    mkdir -p $out/bin
+    ln -s ${unstable.meson}/bin/meson $out/bin/meson
   '';
 
+  cleanNinjaBinary = pkgs.runCommand "clean-ninja-1.12" {} ''
+    mkdir -p $out/bin
+    ln -s ${unstable.ninja}/bin/ninja $out/bin/ninja
+  '';
+
+  # ---------------------------------------------------------------------------
+  # 1. COMMON: Applies to both macOS and Linux
+  # ---------------------------------------------------------------------------
   common = {
     google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
     google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
@@ -29,9 +31,40 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Override the Python packages 'meson' and 'ninja' to be the system tools.
-    meson = cleanMeson;
-    ninja = cleanNinja;
+    # FIX: Override the Python packages 'meson' and 'ninja' to be our sanitized binaries.
+    # This prevents poetry2nix from trying to build them from source.
+    meson = prev.meson.overridePythonAttrs (old: {
+       format = "other";
+       buildCommand = ''
+         mkdir -p $out/bin
+         ln -s ${cleanMesonBinary}/bin/meson $out/bin/meson
+         
+         # Fake python metadata so pip thinks it's installed
+         site_packages=$out/lib/python3.11/site-packages
+         mkdir -p $site_packages/meson-${unstable.meson.version}.dist-info
+         echo "Metadata-Version: 2.1" > $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
+         echo "Name: meson" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
+         echo "Version: ${unstable.meson.version}" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
+       '';
+       # Explicitly propagate the binary so it appears in PATH
+       propagatedBuildInputs = [ cleanMesonBinary ];
+    });
+
+    ninja = prev.ninja.overridePythonAttrs (old: {
+       format = "other";
+       buildCommand = ''
+         mkdir -p $out/bin
+         ln -s ${cleanNinjaBinary}/bin/ninja $out/bin/ninja
+         
+         # Fake python metadata
+         site_packages=$out/lib/python3.11/site-packages
+         mkdir -p $site_packages/ninja-${unstable.ninja.version}.dist-info
+         echo "Metadata-Version: 2.1" > $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
+         echo "Name: ninja" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
+         echo "Version: ${unstable.ninja.version}" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
+       '';
+       propagatedBuildInputs = [ cleanNinjaBinary ];
+    });
 
     # FIX: meson-python needs meson available at build time
     meson-python = prev.meson-python.overridePythonAttrs (old: {
@@ -40,18 +73,17 @@ let
 
     # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
     scipy = prev.scipy.overridePythonAttrs (old: {
-      # 1. Filter out existing meson/ninja (likely stable ones added by poetry2nix)
-      # 2. Prepend our clean/unstable versions and the shim.
-      nativeBuildInputs = [
-        concatToShim # Must be first to define the function for any subsequent hooks
-        cleanMeson 
-        cleanNinja
+      # Use our sanitized tools.
+      # We filter out any "meson" or "ninja" that poetry2nix might auto-add.
+      nativeBuildInputs = (pkgs.lib.filter 
+        (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
+        (old.nativeBuildInputs or [])) 
+      ++ [
+        cleanMesonBinary
+        cleanNinjaBinary
         unstable.pkg-config
         unstable.gfortran
-      ] ++ (pkgs.lib.filter 
-        (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
-        (old.nativeBuildInputs or []))
-      ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+      ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
       
@@ -59,6 +91,7 @@ let
       configurePhase = "true"; 
     });
 
+    # ... rpds-py override (Working) ...
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
