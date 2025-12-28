@@ -2,6 +2,20 @@
 final: prev:
 let
   # ---------------------------------------------------------------------------
+  # Helper: Clean unstable tools without their hooks
+  # ---------------------------------------------------------------------------
+  # We need the binaries from unstable, but their setup hooks are incompatible 
+  # with the stable stdenv (missing 'concatTo', expecting specific file layouts).
+  # So we strip the hooks.
+  mesonNew = unstable.meson.overrideAttrs (old: {
+    setupHook = null;
+  });
+  
+  ninjaNew = unstable.ninja.overrideAttrs (old: {
+    setupHook = null;
+  });
+
+  # ---------------------------------------------------------------------------
   # 1. COMMON: Applies to both macOS and Linux
   # ---------------------------------------------------------------------------
   common = {
@@ -15,21 +29,15 @@ let
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
     # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
-    # We avoid adding meson/ninja to any inputs to prevent their setup hooks 
-    # from firing. Instead, we manually inject them into PATH.
     scipy = prev.scipy.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+        mesonNew  # Unstable binary, NO hook
+        ninjaNew  # Unstable binary, NO hook
         unstable.pkg-config
         unstable.gfortran
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
-
-      # Manually inject unstable meson and ninja into PATH.
-      # This bypasses incompatible setup hooks while providing the tools.
-      preConfigure = ''
-        export PATH="${unstable.meson}/bin:${unstable.ninja}/bin:$PATH"
-      '';
 
       # Disable Nix's automatic meson configure phase.
       configurePhase = "true";
@@ -37,6 +45,7 @@ let
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
+        # Fetch dependencies using the unstable fetcher (required for v4 lockfiles)
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
@@ -52,22 +61,23 @@ let
 
         srcCargoDeps = rustDeps;
         
+        # Disable automatic Rust hooks to prevent version conflicts.
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           unstable.cargo
           unstable.rustc
-          unstable.maturin
-          pkgs.python311Packages.pip
-          pkgs.pkg-config
-        ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+          unstable.maturin      # Use binary directly
+          pkgs.python311Packages.pip # Needed for install phase
+          pkgs.pkg-config       # Helper for finding system libs
+        ];
+
+        # Add macOS-specific system libraries required for linking
+        buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
           pkgs.libiconv
           pkgs.darwin.apple_sdk.frameworks.Security
           pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
         ];
 
-        buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-          pkgs.libiconv
-        ];
-
+        # FIX: Manual Unpack
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
@@ -77,6 +87,7 @@ let
           export sourceRoot="$srcDir"
         '';
 
+        # FIX: Manual Configure (Vendor setup)
         preConfigure = ''
           echo ">>> Manual Cargo Config"
           mkdir -p .cargo
@@ -89,20 +100,25 @@ let
           EOF
           export CARGO_HOME=$(pwd)/.cargo
           
+          # MacOS Fix: Explicitly point to libiconv using Nix string interpolation
           ${pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
              export RUSTFLAGS="-L ${pkgs.libiconv}/lib -l iconv"
           ''}
         '';
 
+        # FIX: Manual Build using Maturin directly
         buildPhase = ''
           echo ">>> Manual BuildPhase with Maturin"
           export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
           maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
         '';
 
+        # FIX: Manual Install & Satisfy poetry2nix dist expectations
         installPhase = ''
           echo ">>> Manual InstallPhase"
           mkdir -p $out
+          
+          # Find the built wheel
           wheel=$(find target/wheels -name "*.whl" | head -n 1)
           if [ -z "$wheel" ]; then echo "❌ Error: No wheel found"; exit 1; fi
           
@@ -114,6 +130,7 @@ let
           cp "$wheel" dist/
         '';
 
+        # Disable all automatic phases we replaced
         wheelUnpackPhase = "true"; 
     });
 
