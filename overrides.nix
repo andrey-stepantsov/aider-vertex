@@ -14,32 +14,38 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Upgrade meson in the python set to unstable (>=1.5.0) for Scipy.
-    # We must clear 'patches' because stable patches fail on unstable source.
-    meson = prev.meson.overridePythonAttrs (old: {
+    # FIX: Override global build tools to avoid hook issues and version mismatches.
+    # We strip setupHook to prevent "concatTo not found" errors in stable stdenv.
+    meson = prev.meson.overrideAttrs (old: {
       src = unstable.meson.src;
       version = unstable.meson.version;
-      patches = []; # Clear stable patches that don't apply to new version
-      setupHook = null; # Disable incompatible hooks
+      patches = [];
+      setupHook = null;
+    });
+
+    ninja = prev.ninja.overrideAttrs (old: {
+      setupHook = null;
     });
 
     # FIX: Scipy 1.15.3 requires newer meson.
     scipy = prev.scipy.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        final.meson # Use our patched meson
-        unstable.ninja
+        final.meson 
+        final.ninja
         unstable.pkg-config
         unstable.gfortran
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
       
-      configurePhase = "true";
+      # Prefer wheel, but if it fails, the source build should now work 
+      # because we provided clean, hook-less, up-to-date tools.
+      preferWheel = true;
+      configurePhase = "true"; 
     });
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
-        # Fetch dependencies using the unstable fetcher (required for v4 lockfiles)
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
