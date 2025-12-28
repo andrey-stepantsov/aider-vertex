@@ -2,6 +2,20 @@
 final: prev:
 let
   # ---------------------------------------------------------------------------
+  # Helper: Clean unstable tools without their hooks
+  # ---------------------------------------------------------------------------
+  # Define clean versions of meson and ninja from unstable.
+  # We strip setupHook to prevent "concatTo not found" and "ninjaFlags not found" errors
+  # caused by unstable hooks running in the stable environment.
+  cleanMeson = unstable.meson.overrideAttrs (old: {
+    setupHook = null;
+  });
+  
+  cleanNinja = unstable.ninja.overrideAttrs (old: {
+    setupHook = null;
+  });
+
+  # ---------------------------------------------------------------------------
   # 1. COMMON: Applies to both macOS and Linux
   # ---------------------------------------------------------------------------
   common = {
@@ -14,33 +28,23 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Upgrade meson in the python set to unstable (>=1.5.0) for Scipy.
-    # We must clear 'patches' because stable patches fail on unstable source.
-    # We remove setupHook to avoid "concatTo not found" errors in stable stdenv.
-    meson = prev.meson.overridePythonAttrs (old: {
-      src = unstable.meson.src;
-      version = unstable.meson.version;
-      patches = []; 
-      setupHook = null;
-    });
+    # FIX: Override the Python packages 'meson' and 'ninja' to be the system tools.
+    # This prevents poetry2nix from trying to build them from source (which fails
+    # with "pyproject.toml not found") and ensures `scipy` uses these updated,
+    # clean binaries instead of the old stable ones.
+    meson = cleanMeson;
+    ninja = cleanNinja;
 
-    # FIX: Upgrade ninja and remove its hook to avoid "ninjaFlags not found" errors.
-    ninja = prev.ninja.overridePythonAttrs (old: {
-      src = unstable.ninja.src;
-      version = unstable.ninja.version;
-      setupHook = null;
-    });
-
-    # FIX: Scipy 1.15.3 requires newer meson.
+    # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
     scipy = prev.scipy.overridePythonAttrs (old: {
       # Explicitly use our overridden (unstable, clean) meson and ninja.
-      # We filter out the old ones to be safe.
+      # We filter out any old ones to be safe.
       nativeBuildInputs = (pkgs.lib.filter 
         (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
         (old.nativeBuildInputs or [])) 
       ++ [
-        final.meson 
-        final.ninja
+        cleanMeson 
+        cleanNinja
         unstable.pkg-config
         unstable.gfortran
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
@@ -48,9 +52,12 @@ let
       ];
       
       preferWheel = true;
+      
+      # Disable Nix's automatic meson configure phase. Let pip/meson-python handle it.
       configurePhase = "true"; 
     });
 
+    # ... rpds-py override ...
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
@@ -65,9 +72,7 @@ let
           version = "0.22.3";
           hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
         };
-
         srcCargoDeps = rustDeps;
-        
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           unstable.cargo
           unstable.rustc
@@ -79,11 +84,9 @@ let
           pkgs.darwin.apple_sdk.frameworks.Security
           pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
         ];
-
         buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
           pkgs.libiconv
         ];
-
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
@@ -92,7 +95,6 @@ let
           echo ">>> Setting sourceRoot to $srcDir"
           export sourceRoot="$srcDir"
         '';
-
         preConfigure = ''
           echo ">>> Manual Cargo Config"
           mkdir -p .cargo
@@ -104,18 +106,15 @@ let
           directory = "$srcCargoDeps"
           EOF
           export CARGO_HOME=$(pwd)/.cargo
-          
           ${pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
              export RUSTFLAGS="-L ${pkgs.libiconv}/lib -l iconv"
           ''}
         '';
-
         buildPhase = ''
           echo ">>> Manual BuildPhase with Maturin"
           export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
           maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
         '';
-
         installPhase = ''
           echo ">>> Manual InstallPhase"
           mkdir -p $out
@@ -127,32 +126,21 @@ let
           mkdir -p dist
           cp "$wheel" dist/
         '';
-
         wheelUnpackPhase = "true"; 
     });
 
     watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
   };
-
+  
   # ---------------------------------------------------------------------------
-  # 2. MACOS: Only applied on Darwin (Manual Wheels)
+  # 2. MACOS & 3. LINUX: Platform-specific overrides
   # ---------------------------------------------------------------------------
-  darwin = if pkgs.stdenv.isDarwin then {
-    # Place your yarl/shapely/tokenizers manual wheel blocks here if they exist
-    # ...
-  } else {};
-
-  # ---------------------------------------------------------------------------
-  # 3. LINUX: Only applied on Linux (Source builds & Manylinux fixes)
-  # ---------------------------------------------------------------------------
+  darwin = if pkgs.stdenv.isDarwin then {} else {};
   linux = if pkgs.stdenv.isLinux then {
-     # <--- TEll AIDER TO EDIT INSIDE THIS SET ONLY
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
     });
   } else {};
-
 in
-  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
