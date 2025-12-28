@@ -14,6 +14,7 @@ in {
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
+  # Dummy tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -59,7 +60,7 @@ in {
   pybind11 = prev.pybind11.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
   });
-
+  
   scipy = prev.scipy.overridePythonAttrs (old: {
     nativeBuildInputs = (pkgs.lib.filter 
       (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
@@ -74,7 +75,7 @@ in {
     propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
   });
 
-  # FIXED RPDS-PY: Manual cargo config to enable offline build
+  # FIXED RPDS-PY: Add missing pip dependency
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
       rustDeps = unstable.rustPlatform.fetchCargoVendor {
@@ -90,22 +91,22 @@ in {
         version = "0.22.3";
         hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
       };
-      srcCargoDeps = rustDeps; # Used by our manual preConfigure
+      cargoDeps = rustDeps;
+      # Added pip here!
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        unstable.cargo unstable.rustc unstable.maturin pkgs.pkg-config
+        unstable.cargo unstable.rustc unstable.maturin pkgs.pkg-config pkgs.python311Packages.pip
       ];
       
       unpackPhase = ''
         tar -xf $src --strip-components=1
       '';
       
-      # Manually point cargo to vendored sources
+      # Manual cargo setup + build
       preConfigure = ''
         mkdir -p .cargo
         cat > .cargo/config.toml <<EOF
         [source.crates-io]
         replace-with = "vendored-sources"
-
         [source.vendored-sources]
         directory = "$srcCargoDeps"
         EOF

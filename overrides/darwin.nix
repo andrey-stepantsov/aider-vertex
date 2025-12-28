@@ -22,25 +22,25 @@ final: prev:
       unstable.meson 
       unstable.ninja
       unstable.pkg-config
-      unstable.gfortran
+      pkgs.gfortran # Use STABLE gfortran
     ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     
-    buildInputs = (old.buildInputs or []) ++ [ unstable.gfortran.cc.lib ];
+    # Use STABLE libgfortran path
+    buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
     
-    # FIX: Aggressive linker flags for macOS Fortran
+    # Inject LDFLAGS for STABLE gfortran
     preConfigure = (old.preConfigure or "") + ''
-      export FC=${unstable.gfortran}/bin/gfortran
-      export MACOSX_DEPLOYMENT_TARGET=11.0
-      export DYLD_LIBRARY_PATH="${unstable.gfortran.cc.lib}/lib:$DYLD_LIBRARY_PATH"
-      export DYLD_FALLBACK_LIBRARY_PATH="${unstable.gfortran.cc.lib}/lib:$DYLD_FALLBACK_LIBRARY_PATH"
-      export LDFLAGS="-L${unstable.gfortran.cc.lib}/lib -Wl,-rpath,${unstable.gfortran.cc.lib}/lib $LDFLAGS"
+      export FC=${pkgs.gfortran}/bin/gfortran
+      export DYLD_LIBRARY_PATH="${pkgs.gfortran.cc.lib}/lib:$DYLD_LIBRARY_PATH"
+      export DYLD_FALLBACK_LIBRARY_PATH="${pkgs.gfortran.cc.lib}/lib:$DYLD_FALLBACK_LIBRARY_PATH"
+      export LDFLAGS="-L${pkgs.gfortran.cc.lib}/lib -Wl,-rpath,${pkgs.gfortran.cc.lib}/lib $LDFLAGS"
     '';
 
     preferWheel = true;
     configurePhase = "true"; 
   });
 
-  # Rpds-py for Darwin (Standard working config)
+  # Rpds-py for Darwin (Unchanged)
   rpds-py = prev.rpds-py.overridePythonAttrs (old: 
     let
       rustDeps = unstable.rustPlatform.fetchCargoVendor {
