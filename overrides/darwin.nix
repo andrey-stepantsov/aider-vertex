@@ -22,68 +22,23 @@ final: prev:
       unstable.meson 
       unstable.ninja
       unstable.pkg-config
-      pkgs.gfortran # Use STABLE gfortran
+      pkgs.gfortran
     ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     
-    # Use STABLE libgfortran path
     buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
     
-    # Inject LDFLAGS for STABLE gfortran
+    # FIX: Add both gfortran.cc.lib and gfortran/lib to rpath
     preConfigure = (old.preConfigure or "") + ''
       export FC=${pkgs.gfortran}/bin/gfortran
-      export DYLD_LIBRARY_PATH="${pkgs.gfortran.cc.lib}/lib:$DYLD_LIBRARY_PATH"
-      export DYLD_FALLBACK_LIBRARY_PATH="${pkgs.gfortran.cc.lib}/lib:$DYLD_FALLBACK_LIBRARY_PATH"
-      export LDFLAGS="-L${pkgs.gfortran.cc.lib}/lib -Wl,-rpath,${pkgs.gfortran.cc.lib}/lib $LDFLAGS"
+      export LDFLAGS="-L${pkgs.gfortran.cc.lib}/lib -L${pkgs.gfortran}/lib -Wl,-rpath,${pkgs.gfortran.cc.lib}/lib -Wl,-rpath,${pkgs.gfortran}/lib $LDFLAGS"
     '';
 
     preferWheel = true;
     configurePhase = "true"; 
   });
 
-  # Rpds-py for Darwin (Unchanged)
-  rpds-py = prev.rpds-py.overridePythonAttrs (old: 
-    let
-      rustDeps = unstable.rustPlatform.fetchCargoVendor {
-        inherit (final.rpds-py) src;
-        name = "rpds-py-vendor";
-        hash = "sha256-2skrDC80g0EKvTEeBI4t4LD7ZXb6jp2Gw+owKFrkZzc=";
-      };
-    in {
-      preferWheel = false; 
-      src = pkgs.fetchPypi {
-        pname = "rpds_py";
-        version = "0.22.3";
-        hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
-      };
-      srcCargoDeps = rustDeps;
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        unstable.cargo unstable.rustc unstable.maturin pkgs.python311Packages.pip pkgs.pkg-config
-        pkgs.libiconv pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-      ];
-      buildInputs = (old.buildInputs or []) ++ [ pkgs.libiconv ];
-      preConfigure = ''
-         mkdir -p .cargo
-         cat > .cargo/config.toml <<EOF
-         [source.crates-io]
-         replace-with = "vendored-sources"
-         [source.vendored-sources]
-         directory = "$srcCargoDeps"
-         EOF
-         export CARGO_HOME=$(pwd)/.cargo
-         export RUSTFLAGS="-L ${pkgs.libiconv}/lib -l iconv"
-      '';
-      buildPhase = ''
-        export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
-        maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
-      '';
-      installPhase = ''
-        mkdir -p $out
-        wheel=$(find target/wheels -name "*.whl" | head -n 1)
-        pip install --no-deps --prefix=$out "$wheel"
-        mkdir -p dist && cp "$wheel" dist/
-      '';
-      wheelUnpackPhase = "true"; 
-  });
+  # Use unstable rpds-py on Darwin too, simpler
+  rpds-py = unstable.python311Packages.rpds-py;
   
   watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
 }
