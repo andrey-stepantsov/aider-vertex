@@ -2,20 +2,6 @@
 final: prev:
 let
   # ---------------------------------------------------------------------------
-  # Helper: Clean unstable tools without their hooks
-  # ---------------------------------------------------------------------------
-  # We need the binaries from unstable, but their setup hooks are incompatible 
-  # with the stable stdenv (missing 'concatTo', expecting specific file layouts).
-  # So we strip the hooks.
-  mesonNew = unstable.meson.overrideAttrs (old: {
-    setupHook = null;
-  });
-  
-  ninjaNew = unstable.ninja.overrideAttrs (old: {
-    setupHook = null;
-  });
-
-  # ---------------------------------------------------------------------------
   # 1. COMMON: Applies to both macOS and Linux
   # ---------------------------------------------------------------------------
   common = {
@@ -28,20 +14,9 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
-    scipy = prev.scipy.overridePythonAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        mesonNew  # Unstable binary, NO hook
-        ninjaNew  # Unstable binary, NO hook
-        unstable.pkg-config
-        unstable.gfortran
-      ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-        pkgs.darwin.apple_sdk.frameworks.Accelerate
-      ];
-
-      # Disable Nix's automatic meson configure phase.
-      configurePhase = "true";
-    });
+    # FIX: Use pre-built scipy from unstable to avoid toolchain/build hell.
+    # This bypasses the need to build scipy 1.15.3 from source with mismatched meson versions.
+    scipy = unstable.python311Packages.scipy;
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
@@ -78,6 +53,7 @@ let
         ];
 
         # FIX: Manual Unpack
+        # poetry2nix mistakenly treats the tarball as a wheel, creating empty dirs.
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
@@ -88,6 +64,7 @@ let
         '';
 
         # FIX: Manual Configure (Vendor setup)
+        # Bypasses cargoSetupHook validation logic
         preConfigure = ''
           echo ">>> Manual Cargo Config"
           mkdir -p .cargo
@@ -107,6 +84,7 @@ let
         '';
 
         # FIX: Manual Build using Maturin directly
+        # Bypasses maturinBuildHook which was using the wrong (stable) Cargo version
         buildPhase = ''
           echo ">>> Manual BuildPhase with Maturin"
           export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
@@ -125,6 +103,8 @@ let
           echo ">>> Installing $wheel"
           pip install --no-deps --prefix=$out "$wheel"
           
+          # CRITICAL FIX: poetry2nix's pythonOutputDistPhase expects the built artifacts in ./dist
+          # If we don't put them there, the build fails after installation.
           echo ">>> Copying wheel to ./dist for poetry2nix compliance"
           mkdir -p dist
           cp "$wheel" dist/
@@ -157,4 +137,5 @@ let
   } else {};
 
 in
+  # Merge the sets (Linux overrides take precedence over Common if duplicates exist)
   common // darwin // linux
