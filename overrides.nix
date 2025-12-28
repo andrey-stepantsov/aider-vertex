@@ -35,6 +35,11 @@ let
     meson = cleanMeson;
     ninja = cleanNinja;
 
+    # FIX: meson-python needs meson available at build time
+    meson-python = prev.meson-python.overridePythonAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
+    });
+
     # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
     scipy = prev.scipy.overridePythonAttrs (old: {
       # Explicitly use our overridden (unstable, clean) meson and ninja.
@@ -43,8 +48,8 @@ let
         (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
         (old.nativeBuildInputs or [])) 
       ++ [
-        cleanMeson 
-        cleanNinja
+        final.meson 
+        final.ninja
         unstable.pkg-config
         unstable.gfortran
       ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
