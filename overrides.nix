@@ -1,18 +1,12 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # ===========================================================================
-  # LINUX OVERRIDES
-  # Strategies: 
-  # 1. Strip hooks from unstable tools to prevent "concatTo: command not found".
-  # 2. Use dummy Python packages for Meson/Ninja to satisfy Pip's dependency 
-  #    checks while using the binary tools.
-  # ===========================================================================
-  linuxOverrides = let
-    cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
-    cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
-  in {
-    # Fix Google Cloud packages
+  # Linux Helpers
+  cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
+  cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
+
+  linuxOverrides = {
+    # ... Google overrides ...
     google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
     google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
     google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
@@ -22,7 +16,7 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # 1. Dummy Meson for Linux
+    # 1. Dummy Meson (Linux)
     meson = pkgs.python311Packages.buildPythonPackage {
       pname = "meson";
       version = unstable.meson.version;
@@ -42,7 +36,7 @@ let
       propagatedBuildInputs = [ cleanMesonBinary ];
     };
 
-    # 2. Dummy Ninja for Linux
+    # 2. Dummy Ninja (Linux)
     ninja = pkgs.python311Packages.buildPythonPackage {
       pname = "ninja";
       version = unstable.ninja.version;
@@ -65,6 +59,11 @@ let
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
       propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
     });
+
+    # Fix pybind11 on Linux (needs ninja)
+    pybind11 = prev.pybind11.overridePythonAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
+    });
     
     scipy = prev.scipy.overridePythonAttrs (old: {
       nativeBuildInputs = (pkgs.lib.filter 
@@ -75,13 +74,12 @@ let
       configurePhase = "true";
     });
 
-    # Watchfiles on Linux needs special care for anyio
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
       preferWheel = true;
       propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
     });
 
-    # Rpds-py override (Same as before)
+    # Rpds-py override for Linux (Fixed format)
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
@@ -91,6 +89,7 @@ let
         };
       in {
         preferWheel = false; 
+        format = "pyproject"; # Force source build
         src = pkgs.fetchPypi {
           pname = "rpds_py";
           version = "0.22.3";
@@ -100,8 +99,14 @@ let
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           unstable.cargo unstable.rustc unstable.maturin pkgs.python311Packages.pip pkgs.pkg-config
         ];
+        unpackPhase = ''
+          tar -xf $src
+          srcDir=$(find . -maxdepth 1 -type d -name "rpds_py*" -o -name "rpds-py*" | head -n 1)
+          export sourceRoot="$srcDir"
+        '';
         buildPhase = ''
           export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
+          cd $sourceRoot
           maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
         '';
         installPhase = ''
@@ -110,16 +115,11 @@ let
           pip install --no-deps --prefix=$out "$wheel"
           mkdir -p dist && cp "$wheel" dist/
         '';
-        wheelUnpackPhase = "true"; 
     });
   };
 
   # ===========================================================================
   # DARWIN OVERRIDES
-  # Strategies:
-  # 1. Use the REAL unstable meson (Python app). macOS doesn't crash on hooks,
-  #    so we can just use the real package which satisfies pip.
-  # 2. Explicitly handle Fortran linking (LDFLAGS) to fix "not runnable" errors.
   # ===========================================================================
   darwinOverrides = {
     # Fix Google Cloud packages
@@ -132,12 +132,11 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # On macOS, just use unstable meson directly. It has correct metadata.
+    # On macOS, use real packages (no hooks issues usually)
     meson = unstable.meson;
     ninja = unstable.ninja;
 
     scipy = prev.scipy.overridePythonAttrs (old: {
-      # Use unstable tools (for version requirements) but STABLE Fortran (for system compat)
       nativeBuildInputs = (pkgs.lib.filter 
         (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
         (old.nativeBuildInputs or [])) 
@@ -145,24 +144,22 @@ let
         unstable.meson 
         unstable.ninja
         unstable.pkg-config
-        pkgs.gfortran
+        unstable.gfortran # Trying UNSTABLE again
       ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
       
-      # FIX: macOS Gfortran Linking
-      # We explicitly inject the library path into LDFLAGS to help dyld find libgfortran
-      buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
+      # Try to fix linking by explicit flags
+      buildInputs = (old.buildInputs or []) ++ [ unstable.gfortran.cc.lib ];
       
       preConfigure = (old.preConfigure or "") + ''
-        export LDFLAGS="-L${pkgs.gfortran.cc.lib}/lib -Wl,-rpath,${pkgs.gfortran.cc.lib}/lib $LDFLAGS"
-        # Sometimes setting FC helps meson find the right wrapper
-        export FC=${pkgs.gfortran}/bin/gfortran
+        export FC=${unstable.gfortran}/bin/gfortran
+        export LDFLAGS="-L${unstable.gfortran.cc.lib}/lib -Wl,-rpath,${unstable.gfortran.cc.lib}/lib $LDFLAGS"
       '';
 
       preferWheel = true;
       configurePhase = "true"; 
     });
 
-    # Copy of RPDS override for Darwin (same logic)
+    # Copy of RPDS override for Darwin
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
