@@ -75,24 +75,23 @@ in {
   });
 
   # GRAFTED RPDS-PY
-  # We completely replace the poetry derivation with a standard Nixpkgs buildPythonPackage
-  # This ensures cargoPatches and cargoSetupHook work exactly as they do in nixpkgs.
+  # Replaced poetry derivation with standard buildPythonPackage.
+  # UPDATED: Using UNSTABLE build tools to support newer pyproject.toml syntax.
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
     format = "pyproject";
     
-    # Inherit everything necessary from Unstable
     inherit (unstable.python311Packages.rpds-py) src cargoDeps;
     patches = unstable.python311Packages.rpds-py.patches or [];
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
 
     nativeBuildInputs = [
-      pkgs.cargo 
-      pkgs.rustc 
-      pkgs.rustPlatform.cargoSetupHook 
-      pkgs.rustPlatform.maturinBuildHook 
+      unstable.cargo 
+      unstable.rustc 
+      unstable.rustPlatform.cargoSetupHook 
+      unstable.rustPlatform.maturinBuildHook 
       pkgs.pkg-config
     ];
   };
