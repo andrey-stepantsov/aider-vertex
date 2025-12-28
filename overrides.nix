@@ -30,18 +30,19 @@ let
           hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
         };
 
-        # HACK: Do NOT set 'cargoDeps'. 
-        # We rename it to 'srcCargoDeps' so we can use it manually in preConfigure
-        # without triggering the automatic cargoSetupHook.
-        srcCargoDeps = rustDeps;
-        
-        # Disable automatic Rust hooks to prevent conflicts. 
-        # We only need the binaries.
+        # Disable automatic Rust hooks to prevent version conflicts.
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
           unstable.cargo
           unstable.rustc
-          unstable.maturin # Use binary directly
+          unstable.maturin      # Use binary directly
           pkgs.python311Packages.pip # Needed for install phase
+          pkgs.pkg-config       # Helper for finding system libs
+        ];
+
+        # Add macOS-specific system libraries required for linking
+        buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+          pkgs.libiconv
+          pkgs.darwin.apple_sdk.frameworks.Security
         ];
 
         # FIX: Manual Unpack
@@ -58,17 +59,15 @@ let
         # FIX: Manual Configure (Vendor setup)
         # Bypasses cargoSetupHook validation logic
         preConfigure = ''
-          echo ">>> Manual Cargo Config: Pointing to vendor directory: $srcCargoDeps"
+          echo ">>> Manual Cargo Config"
           mkdir -p .cargo
           cat > .cargo/config.toml <<EOF
           [source.crates-io]
           replace-with = "vendored-sources"
 
           [source.vendored-sources]
-          directory = "$srcCargoDeps"
+          directory = "${rustDeps}"
           EOF
-          
-          # Ensure Cargo uses this config
           export CARGO_HOME=$(pwd)/.cargo
         '';
 
