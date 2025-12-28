@@ -60,7 +60,7 @@ in {
   pybind11 = prev.pybind11.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
   });
-
+  
   scipy = prev.scipy.overridePythonAttrs (old: {
     nativeBuildInputs = (pkgs.lib.filter 
       (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
@@ -75,6 +75,58 @@ in {
     propagatedBuildInputs = (pkgs.lib.filter (p: p.pname != "anyio") old.propagatedBuildInputs) ++ [ final.anyio ];
   });
 
-  # FIXED RPDS-PY: Use the one from unstable nixpkgs which is already 0.22.3 and builds correctly
-  rpds-py = unstable.python311Packages.rpds-py;
+  # FIXED RPDS-PY: Build from source within the correct Python env
+  rpds-py = prev.rpds-py.overridePythonAttrs (old: 
+    let
+      rustDeps = unstable.rustPlatform.fetchCargoVendor {
+        inherit (final.rpds-py) src;
+        name = "rpds-py-vendor";
+        hash = "sha256-2skrDC80g0EKvTEeBI4t4LD7ZXb6jp2Gw+owKFrkZzc=";
+      };
+    in {
+      preferWheel = false; 
+      format = "pyproject";
+      src = pkgs.fetchPypi {
+        pname = "rpds_py";
+        version = "0.22.3";
+        hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
+      };
+      cargoDeps = rustDeps;
+      # Add pip to nativeBuildInputs!
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+        unstable.cargo unstable.rustc unstable.maturin pkgs.pkg-config pkgs.python311Packages.pip
+      ];
+      
+      # Use manual unpack to flatten dir so we know where Cargo.toml is
+      unpackPhase = ''
+        tar -xf $src --strip-components=1
+      '';
+      
+      # Manual cargo setup (because maturinBuildHook isn't running)
+      preConfigure = ''
+        mkdir -p .cargo
+        cat > .cargo/config.toml <<EOF
+        [source.crates-io]
+        replace-with = "vendored-sources"
+        [source.vendored-sources]
+        directory = "$srcCargoDeps"
+        EOF
+        export CARGO_HOME=$(pwd)/.cargo
+      '';
+
+      # Manual build to bypass crashing hook
+      buildPhase = ''
+        export PATH="${unstable.cargo}/bin:${unstable.rustc}/bin:$PATH"
+        maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
+      '';
+      
+      installPhase = ''
+        mkdir -p $out
+        wheel=$(find target/wheels -name "*.whl" | head -n 1)
+        pip install --no-deps --prefix=$out "$wheel"
+        mkdir -p dist && cp "$wheel" dist/
+      '';
+      
+      wheelUnpackPhase = null;
+  });
 }
