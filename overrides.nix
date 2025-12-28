@@ -1,9 +1,6 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # ---------------------------------------------------------------------------
-  # Helper: Clean unstable tools without their hooks
-  # ---------------------------------------------------------------------------
   cleanMesonBinary = unstable.meson.overrideAttrs (old: {
     setupHook = null;
   });
@@ -22,12 +19,11 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Create a robust dummy Meson package that satisfies pip AND provides the tool.
     meson = pkgs.python311Packages.buildPythonPackage {
       pname = "meson";
       version = unstable.meson.version;
       format = "other";
-      src = ./.; # Dummy
+      src = ./.; 
       unpackPhase = "true";
       installPhase = ''
         mkdir -p $out/bin
@@ -39,19 +35,16 @@ let
         echo "Name: meson" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
         echo "Version: ${unstable.meson.version}" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
         
-        # Link the module so imports work (crucial for meson-python)
         ln -s ${cleanMesonBinary}/lib/python*/site-packages/mesonbuild $site_packages/mesonbuild
       '';
-      # Propagate the binary derivation just in case
       propagatedBuildInputs = [ cleanMesonBinary ];
-    };
+    });
 
-    # FIX: Create a robust dummy Ninja package.
     ninja = pkgs.python311Packages.buildPythonPackage {
       pname = "ninja";
       version = unstable.ninja.version;
       format = "other";
-      src = ./.; # Dummy
+      src = ./.; 
       unpackPhase = "true";
       installPhase = ''
         mkdir -p $out/bin
@@ -62,23 +55,13 @@ let
         echo "Metadata-Version: 2.1" > $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
         echo "Name: ninja" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
         echo "Version: ${unstable.ninja.version}" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
-        
-        # Ninja python package is usually just a wrapper, no big module to link.
-        # But create a dummy module to be safe.
-        touch $site_packages/ninja.py
       '';
       propagatedBuildInputs = [ cleanNinjaBinary ];
-    };
+    });
 
-    # FIX: Ensure meson-python uses our dummy meson.
     meson-python = prev.meson-python.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
       propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
-    });
-
-    # FIX: Ensure pybind11 uses our dummy ninja.
-    pybind11 = prev.pybind11.overridePythonAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
     });
 
     # FIX: Scipy 1.15.3 requires newer meson.
@@ -96,10 +79,14 @@ let
       ];
       
       # FIX: macOS gfortran linking issues. 
-      # Adding libgfortran is critical for the sanity check to pass.
       buildInputs = (old.buildInputs or []) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
         pkgs.gfortran.cc.lib
       ];
+      
+      # FIX: Ensure runtime libraries are found by meson/ld on macOS
+      preConfigure = (old.preConfigure or "") + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+        export LDFLAGS="-L${pkgs.gfortran.cc.lib}/lib -Wl,-rpath,${pkgs.gfortran.cc.lib}/lib $LDFLAGS"
+      '';
 
       preferWheel = true;
       configurePhase = "true"; 
