@@ -75,11 +75,16 @@ in {
   });
 
   # GRAFTED RPDS-PY
-  # Fixed: Force format=pyproject, add cargoSetupHook, AND inherit cargoPatches to provide Cargo.lock
+  # Fixed: Inherit ALL patch mechanisms (patches, cargoPatches, postPatch) from Unstable
   rpds-py = prev.rpds-py.overridePythonAttrs (old: {
     format = "pyproject";
     inherit (unstable.python311Packages.rpds-py) src cargoDeps;
+    
+    # Inherit any patches or post-patch logic that Unstable uses to inject Cargo.lock
+    patches = unstable.python311Packages.rpds-py.patches or [];
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
+    postPatch = unstable.python311Packages.rpds-py.postPatch or "";
+
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
       pkgs.cargo 
       pkgs.rustc 
