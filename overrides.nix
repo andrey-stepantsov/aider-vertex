@@ -2,8 +2,16 @@
 final: prev:
 let
   # ---------------------------------------------------------------------------
-  # 1. COMMON: Applies to both macOS and Linux
+  # Helper: Clean unstable tools without their hooks
   # ---------------------------------------------------------------------------
+  cleanMeson = unstable.meson.overrideAttrs (old: {
+    setupHook = null;
+  });
+  
+  cleanNinja = unstable.ninja.overrideAttrs (old: {
+    setupHook = null;
+  });
+
   common = {
     google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
     google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
@@ -14,26 +22,41 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Update meson Python package to unstable version so Scipy 1.15.3 is happy.
-    # We use overridePythonAttrs to keep it a valid Python package.
+    # FIX: Update meson Python package to unstable version (1.5+) for Scipy.
+    # We strip setupHook to prevent "concatTo not found" errors in stable stdenv.
     meson = prev.meson.overridePythonAttrs (old: {
       version = unstable.meson.version;
       src = unstable.meson.src;
-      patches = []; # Clear stable patches
+      patches = [];
+      setupHook = null;
     });
 
-    # FIX: Replace ninja Python package with system binary to avoid build failure.
-    # The python package build was failing, and we just need the binary.
-    ninja = unstable.ninja.overrideAttrs (old: {
-      setupHook = null; # Ensure no bad hooks
+    # FIX: Replace ninja Python package with system binary wrapper.
+    # Prevents "pyproject.toml not found" errors and provides the binary for build systems.
+    ninja = prev.ninja.overridePythonAttrs (old: {
+      # Don't try to build from source
+      format = "other";
+      # Manually link the binary and create metadata
+      buildCommand = ''
+        mkdir -p $out/bin
+        ln -s ${unstable.ninja}/bin/ninja $out/bin/ninja
+        
+        # Create dummy dist-info so pip thinks it's installed
+        site_packages=$out/lib/python3.11/site-packages
+        mkdir -p $site_packages/ninja-1.11.1.dist-info
+        echo "Metadata-Version: 2.1" > $site_packages/ninja-1.11.1.dist-info/METADATA
+        echo "Name: ninja" >> $site_packages/ninja-1.11.1.dist-info/METADATA
+        echo "Version: 1.11.1" >> $site_packages/ninja-1.11.1.dist-info/METADATA
+      '';
+      propagatedBuildInputs = [ unstable.ninja ];
     });
 
-    # FIX: meson-python needs meson available
+    # FIX: meson-python needs meson available at build time
     meson-python = prev.meson-python.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
     });
 
-    # FIX: Scipy 1.15.3 requires newer meson.
+    # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
     scipy = prev.scipy.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
         final.meson 
@@ -123,9 +146,6 @@ let
     watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
   };
   
-  # ---------------------------------------------------------------------------
-  # 2. MACOS & 3. LINUX: Platform-specific overrides
-  # ---------------------------------------------------------------------------
   darwin = if pkgs.stdenv.isDarwin then {} else {};
   linux = if pkgs.stdenv.isLinux then {
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
