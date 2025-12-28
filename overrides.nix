@@ -15,8 +15,6 @@ let
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
     # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0) than in stable.
-    # We also inject 'concatTo' because unstable meson's hook expects it, 
-    # but the stable stdenv doesn't provide it.
     scipy = prev.scipy.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
         unstable.meson
@@ -27,15 +25,9 @@ let
         unstable.darwin.apple_sdk.frameworks.Accelerate
       ];
 
-      preConfigure = (old.preConfigure or "") + ''
-        # SHIM: Define concatTo for unstable meson hook running in stable stdenv
-        concatTo() {
-          local target="$1"
-          shift
-          cat "$@" >> "$target"
-        }
-        export -f concatTo
-      '';
+      # Disable Nix's automatic meson configure phase.
+      # Let pip/meson-python handle the build setup.
+      configurePhase = "true";
     });
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
@@ -73,7 +65,6 @@ let
         ];
 
         # FIX: Manual Unpack
-        # poetry2nix mistakenly treats the tarball as a wheel, creating empty dirs.
         unpackPhase = ''
           echo ">>> Manual UnpackPhase: Extracting $src"
           tar -xf $src
@@ -93,7 +84,7 @@ let
           replace-with = "vendored-sources"
 
           [source.vendored-sources]
-          directory = "${rustDeps}"
+          directory = "$srcCargoDeps"
           EOF
           export CARGO_HOME=$(pwd)/.cargo
           
@@ -104,7 +95,6 @@ let
         '';
 
         # FIX: Manual Build using Maturin directly
-        # Bypasses maturinBuildHook which was using the wrong (stable) Cargo version
         buildPhase = ''
           echo ">>> Manual BuildPhase with Maturin"
           # Ensure we use the unstable cargo
@@ -128,7 +118,6 @@ let
           pip install --no-deps --prefix=$out "$wheel"
           
           # CRITICAL FIX: poetry2nix's pythonOutputDistPhase expects the built artifacts in ./dist
-          # If we don't put them there, the build fails after installation.
           echo ">>> Copying wheel to ./dist for poetry2nix compliance"
           mkdir -p dist
           cp "$wheel" dist/
