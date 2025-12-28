@@ -38,52 +38,15 @@ final: prev:
     configurePhase = "true"; 
   });
 
-  # Rpds-py for Darwin (Stable Rust = fetchCargoTarball)
-  rpds-py = prev.rpds-py.overridePythonAttrs (old: 
-    let
-      # Use fetchCargoTarball for stable nixpkgs
-      rustDeps = pkgs.rustPlatform.fetchCargoTarball {
-        inherit (final.rpds-py) src;
-        name = "rpds-py-vendor";
-        # Hash for fetchCargoTarball (different from fetchCargoVendor!)
-        hash = "sha256-0YwuSSV2BuD3f2tHDLRN12umkfSaJGIX9pw4/rf20V8=";
-      };
-    in {
-      preferWheel = false; 
-      src = pkgs.fetchPypi {
-        pname = "rpds_py";
-        version = "0.22.3";
-        hash = "sha256-4y/uirRdPC222hmlMjvDNiI3yLZTxwGUQUuJL9BqCA0=";
-      };
-      cargoDeps = rustDeps;
-      
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        pkgs.cargo pkgs.rustc pkgs.maturin pkgs.python311Packages.pip pkgs.pkg-config
-        pkgs.libiconv pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-      ];
-      buildInputs = (old.buildInputs or []) ++ [ pkgs.libiconv ];
-      preConfigure = ''
-         mkdir -p .cargo
-         cat > .cargo/config.toml <<EOF
-         [source.crates-io]
-         replace-with = "vendored-sources"
-         [source.vendored-sources]
-         directory = "$srcCargoDeps"
-         EOF
-         export CARGO_HOME=$(pwd)/.cargo
-         export RUSTFLAGS="-L ${pkgs.libiconv}/lib -l iconv"
-      '';
-      buildPhase = ''
-        export PATH="${pkgs.cargo}/bin:${pkgs.rustc}/bin:$PATH"
-        maturin build --release --jobs $NIX_BUILD_CORES --strip -i python3
-      '';
-      installPhase = ''
-        mkdir -p $out
-        wheel=$(find target/wheels -name "*.whl" | head -n 1)
-        pip install --no-deps --prefix=$out "$wheel"
-        mkdir -p dist && cp "$wheel" dist/
-      '';
-      wheelUnpackPhase = "true"; 
+  # GRAFTED RPDS-PY: Use unstable source/deps with stable build environment
+  rpds-py = prev.rpds-py.overridePythonAttrs (old: {
+    inherit (unstable.python311Packages.rpds-py) src cargoDeps;
+    
+    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+      pkgs.cargo pkgs.rustc pkgs.rustPlatform.maturinBuildHook pkgs.pkg-config
+      pkgs.libiconv pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+    ];
+    buildInputs = (old.buildInputs or []) ++ [ pkgs.libiconv ];
   });
   
   watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
