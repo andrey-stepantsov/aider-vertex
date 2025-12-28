@@ -1,6 +1,9 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
+  # ---------------------------------------------------------------------------
+  # Helper: Clean unstable tools without their hooks
+  # ---------------------------------------------------------------------------
   cleanMesonBinary = unstable.meson.overrideAttrs (old: {
     setupHook = null;
   });
@@ -19,11 +22,14 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
+    # FIX: Override 'meson' Python package using buildPythonPackage.
+    # We use unstable version to satisfy Scipy 1.15.3 requirement (meson >= 1.5.0).
+    # We use a dummy source build that just symlinks the binary and modules.
     meson = pkgs.python311Packages.buildPythonPackage {
       pname = "meson";
       version = unstable.meson.version;
       format = "other";
-      src = ./.; 
+      src = ./.; # Dummy
       unpackPhase = "true";
       installPhase = ''
         mkdir -p $out/bin
@@ -35,16 +41,19 @@ let
         echo "Name: meson" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
         echo "Version: ${unstable.meson.version}" >> $site_packages/meson-${unstable.meson.version}.dist-info/METADATA
         
+        # Link the module so imports work
+        mkdir -p $site_packages
         ln -s ${cleanMesonBinary}/lib/python*/site-packages/mesonbuild $site_packages/mesonbuild
       '';
       propagatedBuildInputs = [ cleanMesonBinary ];
-    });
+    };
 
+    # FIX: Override 'ninja' Python package using buildPythonPackage.
     ninja = pkgs.python311Packages.buildPythonPackage {
       pname = "ninja";
       version = unstable.ninja.version;
       format = "other";
-      src = ./.; 
+      src = ./.; # Dummy
       unpackPhase = "true";
       installPhase = ''
         mkdir -p $out/bin
@@ -57,8 +66,9 @@ let
         echo "Version: ${unstable.ninja.version}" >> $site_packages/ninja-${unstable.ninja.version}.dist-info/METADATA
       '';
       propagatedBuildInputs = [ cleanNinjaBinary ];
-    });
+    };
 
+    # FIX: meson-python needs meson available.
     meson-python = prev.meson-python.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
       propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
