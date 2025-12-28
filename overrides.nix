@@ -14,18 +14,19 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Upgrade meson in the python set to unstable (>=1.5.0) for Scipy
+    # FIX: Upgrade meson in the python set to unstable (>=1.5.0) for Scipy.
+    # We must clear 'patches' because stable patches fail on unstable source.
     meson = prev.meson.overridePythonAttrs (old: {
       src = unstable.meson.src;
       version = unstable.meson.version;
-      # Meson setup hooks are incompatible with stable stdenv, disable them
-      setupHook = null;
+      patches = []; # Clear stable patches that don't apply to new version
+      setupHook = null; # Disable incompatible hooks
     });
 
     # FIX: Scipy 1.15.3 requires newer meson.
     scipy = prev.scipy.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        final.meson # Use our overridden meson
+        final.meson # Use our patched meson
         unstable.ninja
         unstable.pkg-config
         unstable.gfortran
@@ -33,15 +34,12 @@ let
         pkgs.darwin.apple_sdk.frameworks.Accelerate
       ];
       
-      # Try to use wheel first
-      preferWheel = true;
-      
-      # Disable Nix's automatic meson configure phase.
       configurePhase = "true";
     });
 
     rpds-py = prev.rpds-py.overridePythonAttrs (old: 
       let
+        # Fetch dependencies using the unstable fetcher (required for v4 lockfiles)
         rustDeps = unstable.rustPlatform.fetchCargoVendor {
           inherit (final.rpds-py) src;
           name = "rpds-py-vendor";
