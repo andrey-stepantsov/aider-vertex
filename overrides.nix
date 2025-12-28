@@ -2,21 +2,8 @@
 final: prev:
 let
   # ---------------------------------------------------------------------------
-  # Helper: Clean unstable tools without their hooks
+  # 1. COMMON: Applies to both macOS and Linux
   # ---------------------------------------------------------------------------
-  # We need the binaries from unstable for Scipy 1.15.3, but we must strip their
-  # setup hooks. The hooks cause failures (missing 'concatTo', expecting 'ninjaFlags')
-  # when running in the stable stdenv or when we bypass standard phases.
-  # We use these to replace the Python packages 'meson' and 'ninja' that poetry2nix
-  # would otherwise try to build from source (and fail).
-  cleanMeson = unstable.meson.overrideAttrs (old: {
-    setupHook = null;
-  });
-  
-  cleanNinja = unstable.ninja.overrideAttrs (old: {
-    setupHook = null;
-  });
-
   common = {
     google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
     google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
@@ -27,27 +14,28 @@ let
     google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
     google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-    # FIX: Override the Python packages 'meson' and 'ninja' to be the system tools.
-    # This prevents poetry2nix from trying to build them from source (which fails)
-    # and ensures `scipy` uses these updated, clean binaries.
-    # By using 'overridePythonAttrs', we replace the derivation poetry2nix generated.
-    # We replace it with our clean system tool derivation.
-    meson = cleanMeson;
-    ninja = cleanNinja;
+    # FIX: Update meson Python package to unstable version so Scipy 1.15.3 is happy.
+    # We use overridePythonAttrs to keep it a valid Python package.
+    meson = prev.meson.overridePythonAttrs (old: {
+      version = unstable.meson.version;
+      src = unstable.meson.src;
+      patches = []; # Clear stable patches
+    });
 
-    # FIX: meson-python needs meson available at build time
+    # FIX: Replace ninja Python package with system binary to avoid build failure.
+    # The python package build was failing, and we just need the binary.
+    ninja = unstable.ninja.overrideAttrs (old: {
+      setupHook = null; # Ensure no bad hooks
+    });
+
+    # FIX: meson-python needs meson available
     meson-python = prev.meson-python.overridePythonAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
     });
 
-    # FIX: Scipy 1.15.3 requires newer meson (>=1.5.0).
+    # FIX: Scipy 1.15.3 requires newer meson.
     scipy = prev.scipy.overridePythonAttrs (old: {
-      # Explicitly use our overridden (unstable, clean) meson and ninja.
-      # We filter out any old ones that might be pulled in transitively to be safe.
-      nativeBuildInputs = (pkgs.lib.filter 
-        (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
-        (old.nativeBuildInputs or [])) 
-      ++ [
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
         final.meson 
         final.ninja
         unstable.pkg-config
@@ -135,6 +123,9 @@ let
     watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
   };
   
+  # ---------------------------------------------------------------------------
+  # 2. MACOS & 3. LINUX: Platform-specific overrides
+  # ---------------------------------------------------------------------------
   darwin = if pkgs.stdenv.isDarwin then {} else {};
   linux = if pkgs.stdenv.isLinux then {
     watchfiles = prev.watchfiles.overridePythonAttrs (old: {
