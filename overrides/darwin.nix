@@ -40,9 +40,11 @@ final: prev:
   });
 
   # GRAFTED RPDS-PY for Darwin
+  # Fixed: Force format=pyproject, add cargoSetupHook, AND inherit cargoPatches
   rpds-py = prev.rpds-py.overridePythonAttrs (old: {
     format = "pyproject";
     inherit (unstable.python311Packages.rpds-py) src cargoDeps;
+    cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
       pkgs.cargo 
       pkgs.rustc 
