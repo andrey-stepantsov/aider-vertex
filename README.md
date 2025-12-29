@@ -6,15 +6,28 @@ This package bridges the gap between Aider's rapid development cycle and the spe
 
 ## Features
 - **Nix Powered**: Fully reproducible build environment for Intel/Silicon Macs and Linux.
-  - Multi-platform: Verified on macOS (Apple Silicon). Support for Linux and Intel Macs is included in the configuration but is currently experimental/untested.
+  - **Multi-platform**: Verified on **macOS (Apple Silicon)**, **Ubuntu**, and **CentOS 7**.
 - **Vertex Ready**: Includes patched dependencies for `google-cloud-aiplatform`, `watchfiles`, and `rpds-py`.
 - **Cutting Edge**: Currently tracks **Aider v0.86.1** with Tree-sitter and Architect mode support.
+- **Docker Ready**: Available as a zero-dependency container image.
 - **Transparent**: Passes all CLI arguments directly to the underlying Aider engine.
 
 ## Installation
 
-### Run directly (No installation)
-If you have Nix installed with Flakes enabled, you can run Aider-Vertex instantly:
+### 🐳 Run with Docker (Recommended for non-Nix users)
+You can run Aider-Vertex immediately without installing Nix, Python, or Git:
+
+```bash
+docker run -it --rm \
+  -v $(pwd):/data \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/data/your-creds.json \
+  -e VERTEXAI_PROJECT="your-project-id" \
+  -e VERTEXAI_LOCATION="us-central1" \
+  ghcr.io/andrey-stepantsov/aider-vertex:latest
+```
+
+### Run directly with Nix
+If you have Nix installed with Flakes enabled, you can run it instantly:
 
     nix run github:andrey-stepantsov/aider-vertex -- --architect --model vertex_ai/gemini-2.5-flash
 
@@ -63,10 +76,13 @@ To update the underlying Aider engine or add new dependencies:
 2. **Refresh the Lockfile**:
     nix shell nixpkgs#poetry nixpkgs#python311 -c poetry update aider-chat
 3. **Rebuild and Verify**:
-    git add .
+    # Uses ./ci-loop.sh or manual build
     nix build . -L
     ./result/bin/aider-vertex --version
 4. **Release**:
+   Pushing to `main` automatically publishes the `latest` Docker image.
+   Pushing a tag creates a versioned release:
+   
     git tag -a v1.0.x -m "Release v1.0.x: Wrapping Aider v0.86.1"
     git push origin main --follow-tags
 
@@ -94,5 +110,3 @@ Search Integration: Explore adding search tool capabilities for real-time librar
 Image Context: Optimize the pipeline for sending local screenshots and diagrams to Gemini's multi-modal endpoint.
 
 Context Caching: Implement logic to leverage Vertex AI's context caching for massive codebases (reducing token costs).
-
-
