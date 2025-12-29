@@ -15,7 +15,7 @@ in
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy tools
+  # Dummy tools - Still needed for other packages like pybind11
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -64,39 +64,10 @@ in
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  scipy = prev.scipy.overridePythonAttrs (old: {
-    nativeBuildInputs = (pkgs.lib.filter 
-      (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
-      (old.nativeBuildInputs or [])) 
-    ++ [
-      final.meson 
-      final.ninja
-      unstable.pkg-config
-      pkgs.gfortran # Use STABLE gfortran
-    ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
-    
-    buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
-    
-    # Aggressive Linking to find Stable libgfortran
-    # Removed MACOSX_DEPLOYMENT_TARGET to let Nix handle SDK selection
-    # Added LC_ALL/LANG to fix potential encoding issues in meson
-    preConfigure = (old.preConfigure or "") + ''
-      export FC=${pkgs.gfortran}/bin/gfortran
-      
-      # Find the actual library path (often in lib/gcc/...)
-      export GFORTRAN_LIB=$(dirname $(${pkgs.gfortran}/bin/gfortran -print-file-name=libgfortran.dylib))
-      echo "Found GFortran Lib at: $GFORTRAN_LIB"
-      
-      # Inject into everything
-      export DYLD_LIBRARY_PATH="$GFORTRAN_LIB:$DYLD_LIBRARY_PATH"
-      export DYLD_FALLBACK_LIBRARY_PATH="$GFORTRAN_LIB:$DYLD_FALLBACK_LIBRARY_PATH"
-      export LDFLAGS="-L$GFORTRAN_LIB -Wl,-rpath,$GFORTRAN_LIB $LDFLAGS"
-      export NIX_LDFLAGS="-L$GFORTRAN_LIB -rpath $GFORTRAN_LIB $NIX_LDFLAGS"
-    '';
-
-    preferWheel = true;
-    configurePhase = "true"; 
-  });
+  # GRAFTED SCIPY for Darwin
+  # Strategy: Bypass source build entirely and use the pre-built binary from Nixpkgs Unstable.
+  # This avoids the "Executables not runnable" linker hell.
+  scipy = unstable.python311Packages.scipy;
 
   # GRAFTED RPDS-PY for Darwin
   rpds-py = pkgs.python311Packages.buildPythonPackage {
