@@ -6,7 +6,7 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     poetry2nix = {
       url = "github:nix-community/poetry2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "nixpkgs-unstable"; # CHANGED: Follow Unstable to avoid deprecated SDKs
     };
   };
 
@@ -17,19 +17,12 @@
     in {
       packages = forAllSystems (system:
         let
-          # Define both package sets
           stablePkgs = nixpkgs.legacyPackages.${system};
           unstablePkgs = nixpkgs-unstable.legacyPackages.${system};
           
-          # STRATEGIC SPLIT:
-          # On Linux: Use Stable packages + Stable Python (3.11.10).
-          # On macOS: Use Unstable packages + Unstable Python (3.11.14) to match the grafted SciPy binary.
+          # Linux = Stable, macOS = Unstable
           pkgs = if stablePkgs.stdenv.isDarwin then unstablePkgs else stablePkgs;
           
-          # We still need access to 'unstable' for overrides, but now 'pkgs' itself might BE unstable on Mac.
-          # To avoid confusion in overrides, we pass 'unstablePkgs' explicitly as 'unstable'.
-          
-          # Initialize poetry2nix with the CHOSEN package set (Stable on Linux, Unstable on Mac)
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
           
           googleFix = old: {
@@ -48,7 +41,7 @@
         in {
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
-            python = pkgs.python311; # This will be 3.11.10 on Linux, 3.11.14 on Mac
+            python = pkgs.python311;
             preferWheels = true;
             nativeBuildInputs = [ pkgs.makeWrapper ];
             overrides = p2n.defaultPoetryOverrides.extend myOverrides;
