@@ -15,15 +15,19 @@ This package bridges the gap between Aider's rapid development cycle and the spe
 ## Installation
 
 ### 🐳 Run with Docker (Recommended for non-Nix users)
-You can run Aider-Vertex immediately without installing Nix, Python, or Git:
+You can run Aider-Vertex immediately without installing Nix, Python, or Git.
+
+**Note:** You must mount your Google Cloud credentials into the container so Aider can access them.
 
 ```bash
 docker run -it --rm \
   -v $(pwd):/data \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/data/your-creds.json \
+  -v /path/to/your/credentials.json:/root/auth.json \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/root/auth.json \
   -e VERTEXAI_PROJECT="your-project-id" \
   -e VERTEXAI_LOCATION="us-central1" \
-  ghcr.io/andrey-stepantsov/aider-vertex:latest
+  ghcr.io/andrey-stepantsov/aider-vertex:latest \
+  --model vertex_ai/gemini-2.5-flash
 ```
 
 ### Run directly with Nix

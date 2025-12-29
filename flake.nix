@@ -3,8 +3,6 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
-    # We keep this input just in case poetry2nix needs it, 
-    # but we won't use it for the main build.
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     poetry2nix = {
       url = "github:nix-community/poetry2nix";
@@ -20,11 +18,10 @@
     in {
       packages = forAllSystems (system:
         let
-          # FIX: Use stable 24.11 for BOTH Linux and macOS to ensure SDK stability
           pkgs = nixpkgs.legacyPackages.${system};
-          
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
           
+          # Fix for Google packages that sometimes have license issues in metadata
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -36,17 +33,16 @@
 
           myOverrides = import ./overrides.nix { 
             inherit pkgs googleFix; 
-            # Pass stable as "unstable" to match the overrides signature
             unstable = pkgs; 
           };
 
-          # The main application derivation
           app = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
             preferWheels = true;
             nativeBuildInputs = [ pkgs.makeWrapper ];
             overrides = p2n.defaultPoetryOverrides.extend myOverrides;
+            # Ensure Python runs in UTF-8 mode to avoid encoding crashes
             postFixup = ''
               wrapProgram $out/bin/aider-vertex \
                 --set PYTHONUTF8 1 --set LC_ALL C.UTF-8 --set LANG C.UTF-8
@@ -56,20 +52,19 @@
         in {
           default = app;
 
-          # --- DOCKER OUTPUT ---
           docker = pkgs.dockerTools.buildLayeredImage {
             name = "aider-vertex";
             tag = "latest";
             
-            # The exact same 'app' we built above is placed inside the container
             contents = [ 
               app 
               pkgs.cacert    # Required for HTTPS (Vertex AI API calls)
               pkgs.coreutils # Basic tools (mkdir, ls, etc.)
               pkgs.bash      # Shell for debugging
+              pkgs.git       # Required by Aider for repo management
+              pkgs.openssh   # Required if using git over SSH
             ];
 
-            # Optimization: Create standard paths to avoid "command not found" in rare cases
             fakeRootCommands = ''
               mkdir -p /tmp
               chmod 1777 /tmp
@@ -78,7 +73,7 @@
             '';
 
             config = {
-              # FIX: Use Entrypoint so arguments like '--version' are appended, not replaced
+              # Entrypoint ensures arguments are appended to the command
               Entrypoint = [ "${app}/bin/aider-vertex" ];
               WorkingDir = "/data";
               Volumes = { "/data" = {}; };
