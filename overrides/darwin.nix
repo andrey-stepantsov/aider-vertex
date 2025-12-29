@@ -101,6 +101,7 @@ in
       frameworks.CoreServices
     ];
     buildInputs = [ frameworks.CoreServices ];
+    preferWheel = true; # Merged from duplicate definition
   });
 
   sounddevice = prev.sounddevice.overridePythonAttrs (old: {
@@ -156,7 +157,4 @@ in
       mv target/wheels/*.whl dist/
     '';
   };
-  
-  # Also fix watchfiles buildPhase to match rpds-py strategy
-  watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
 }
