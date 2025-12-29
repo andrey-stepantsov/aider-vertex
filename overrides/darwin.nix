@@ -5,26 +5,29 @@ let
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 
-  # SAFE SDK SOURCE:
-  # Points to the current default SDK frameworks in Nixpkgs Unstable.
-  # This bypasses the deprecated 'apple_sdk_11_0' aliases that cause crashes.
-  frameworks = pkgs.darwin.apple_sdk.frameworks;
+  # FORCE NEW SDK: Explicitly use 14.0 to avoid any 11.0/12.3 deprecation aliases
+  # If 14.0 doesn't exist, we might fail evaluation, but at least we escape 11.0.
+  # Fallback to apple_sdk if 14_0 is missing (but it should be there in Unstable).
+  frameworks = if (builtins.hasAttr "apple_sdk_14_0" pkgs.darwin) 
+               then pkgs.darwin.apple_sdk_14_0.frameworks 
+               else pkgs.darwin.apple_sdk.frameworks;
 
-  # HELPER: Clobber C-extension inputs.
-  # This completely overwrites nativeBuildInputs/buildInputs to remove
-  # any poisoned defaults injected by poetry2nix.
+  # HELPER: Clobber ALL inputs including propagated ones to remove poison
   fixDarwinSDK = pkg: extraNative: extraBuild: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.pkg-config pkgs.libiconv ] ++ extraNative;
     buildInputs = [ pkgs.libiconv ] ++ extraBuild;
+    # Aggressively clear propagated inputs to stop the spread of bad SDK dependencies
+    propagatedBuildInputs = []; 
   });
 
-  # HELPER: Clobber Rust/Maturin inputs.
+  # HELPER: Clobber Rust/Maturin inputs
   fixRustSDK = pkg: extraFrameworks: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ 
       unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
       pkgs.pkg-config pkgs.libiconv 
     ] ++ extraFrameworks;
     buildInputs = [ pkgs.libiconv ] ++ extraFrameworks;
+    propagatedBuildInputs = []; 
   });
 in
 {
@@ -33,10 +36,13 @@ in
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
   google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
   google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
+  google-crc32c = let
+    patched = prev.google-crc32c.overridePythonAttrs googleFix;
+  in fixDarwinSDK patched [] [];
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # --- DUMMY TOOLS (Required for builds that still trigger) ---
+  # Dummy Tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -83,8 +89,8 @@ in
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # --- MASSIVE SDK CLEANUP (Removing deprecated apple_sdk_11_0) ---
-
+  # --- MASSIVE SDK DEPRECATION CLEANUP ---
+  
   # Cryptography Stack
   cryptography = fixDarwinSDK prev.cryptography [ frameworks.Security ] [ pkgs.openssl frameworks.Security ];
   cffi = fixDarwinSDK prev.cffi [ pkgs.libffi ] [ pkgs.libffi ];
@@ -96,11 +102,6 @@ in
     [ pkgs.cmake pkgs.ninja frameworks.CoreFoundation ] 
     [ pkgs.openssl pkgs.zlib frameworks.CoreFoundation ];
   grpcio-status = fixDarwinSDK prev.grpcio-status [] [];
-  
-  # Combined fix for google-crc32c (License fix + SDK fix)
-  google-crc32c = let
-    patched = prev.google-crc32c.overridePythonAttrs googleFix;
-  in fixDarwinSDK patched [] [];
 
   # AIOHTTP Stack
   aiohttp = fixDarwinSDK prev.aiohttp [] [];
@@ -125,10 +126,7 @@ in
   psutil = fixDarwinSDK prev.psutil 
     [ frameworks.IOKit frameworks.CoreFoundation ] 
     [ frameworks.IOKit frameworks.CoreFoundation ];
-  
-  # Pyperclip: Removed SDK inputs to avoid confusion, let it be pure python/system call based
   pyperclip = fixDarwinSDK prev.pyperclip [] [];
-  
   sounddevice = fixDarwinSDK prev.sounddevice 
     [ frameworks.CoreAudio frameworks.AudioToolbox ] 
     [ pkgs.portaudio ];
@@ -152,8 +150,6 @@ in
     [ frameworks.Security frameworks.SystemConfiguration frameworks.CoreFoundation ];
   tiktoken = fixRustSDK prev.tiktoken [ frameworks.Security ];
   tokenizers = fixRustSDK prev.tokenizers [ frameworks.Security ];
-  
-  # Watchfiles uses Rust (maturin) + CoreServices
   watchfiles = let
     base = fixRustSDK prev.watchfiles [ frameworks.CoreServices ];
   in base.overridePythonAttrs (old: { preferWheel = true; });
