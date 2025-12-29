@@ -1,7 +1,6 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # Wrap unstable binaries to look like Python packages
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in
@@ -15,7 +14,6 @@ in
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy tools - Still needed for other packages like pybind11
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -53,24 +51,21 @@ in
     propagatedBuildInputs = [ cleanNinjaBinary ];
   };
 
-  # Inject dummy ninja
   pybind11 = prev.pybind11.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
   });
 
-  # Ensure meson-python finds dummy meson
   meson-python = prev.meson-python.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # GRAFTED SCIPY for Darwin
-  # Strategy: Bypass source build entirely and use the pre-built binary from Nixpkgs Unstable.
-  # This avoids the "Executables not runnable" linker hell.
+  # Grafted Scipy (Binary from Unstable)
   scipy = unstable.python311Packages.scipy;
 
   # GRAFTED RPDS-PY for Darwin
-  rpds-py = pkgs.python311Packages.buildPythonPackage {
+  # Fix: Use unstable.python311Packages to match the Python version of the grafted SciPy
+  rpds-py = unstable.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
     format = "pyproject";
