@@ -14,6 +14,17 @@ final: prev:
   meson = unstable.meson;
   ninja = unstable.ninja;
 
+  # Fix: Inject ninja into pybind11 build inputs
+  pybind11 = prev.pybind11.overridePythonAttrs (old: {
+    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
+  });
+
+  # Fix: Ensure meson-python uses our Unstable meson
+  meson-python = prev.meson-python.overridePythonAttrs (old: {
+    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
+    propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
+  });
+
   scipy = prev.scipy.overridePythonAttrs (old: {
     nativeBuildInputs = (pkgs.lib.filter 
       (p: (p.pname or "") != "meson" && (p.pname or "") != "ninja") 
@@ -40,6 +51,7 @@ final: prev:
   });
 
   # GRAFTED RPDS-PY for Darwin
+  # Strategy: Clean Build + Hybrid Toolchain
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
