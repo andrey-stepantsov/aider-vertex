@@ -3,24 +3,82 @@ on:
   push:
     branches:
       - main
-      - 'agent/**'  # <--- Add this so the agent can trigger builds
+      - 'agent/**'
+      - 'ci/**'
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # <--- Allows manual triggering if needed
+  workflow_dispatch:
 
 jobs:
-  check-build:
-    strategy:
-      matrix:
-        # We verify both, but the agent will focus on the Linux logs
-        os: [ubuntu-latest, macos-latest] 
+  universal-check:
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: "Ubuntu (Nix)"
+            os: ubuntu-latest
+            type: standard
+          - name: "macOS (Nix)"
+            os: macos-latest
+            type: standard
+          - name: "CentOS 7 (Legacy Verify)"
+            os: ubuntu-latest
+            type: centos-docker
+
     steps:
       - uses: actions/checkout@v4
+
+      # --- STANDARD NIX BUILD STEPS (Ubuntu & macOS) ---
       - uses: cachix/install-nix-action@v31
+        if: matrix.type == 'standard'
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Aider-Vertex
-        run: nix build . -L
-      - name: Verify Logic (Version Check)
-        run: ./result/bin/aider-vertex --version
+
+      - name: Build & Verify (Standard)
+        if: matrix.type == 'standard'
+        run: |
+          nix build . -L
+          ./result/bin/aider-vertex --version
+
+      # --- CENTOS DOCKER STEP (Legacy Only) ---
+      - name: Build & Run inside CentOS 7
+        if: matrix.type == 'centos-docker'
+        run: |
+          # 1. Mount pwd to /src
+          # 2. Fix EOL repos
+          # 3. Install Nix (Multi-user)
+          # 4. FIX: Trust /src for git
+          # 5. FIX: Start nix-daemon manually
+          docker run --rm --privileged -v $(pwd):/src -w /src centos:7 bash -c "
+            set -e
+            
+            echo '>>> Fixing EOL Repositories...'
+            sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+            sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+            
+            echo '>>> Installing dependencies...'
+            yum -y install curl xz git sudo
+            
+            echo '>>> Installing Nix...'
+            curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install linux --init none --no-confirm
+            . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+            
+            echo '>>> Configuring Environment...'
+            # FIX 1: Trust the mounted directory (owned by host user)
+            git config --global --add safe.directory /src
+            
+            # FIX 2: Start the daemon in the background (required for multi-user install)
+            /nix/var/nix/profiles/default/bin/nix-daemon > /var/log/nix-daemon.log 2>&1 &
+            
+            # Wait a moment for the socket to appear
+            for i in {1..10}; do
+              if [ -S /nix/var/nix/daemon-socket/socket ]; then break; fi
+              echo 'Waiting for nix-daemon...'
+              sleep 1
+            done
+
+            echo '>>> Running Verification...'
+            nix run . -- --version
+          "
