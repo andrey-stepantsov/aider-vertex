@@ -1,7 +1,6 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # Wrap unstable binaries to look like Python packages
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in
@@ -63,75 +62,77 @@ in
   });
 
   # --- SDK DEPRECATION FIXES ---
-  # Overwrite inputs to purge 'darwin.apple_sdk_11_0' from poetry2nix defaults
-
+  
   cryptography = prev.cryptography.overridePythonAttrs (old: {
-    # Clobber nativeBuildInputs
-    nativeBuildInputs = [
-      pkgs.pkg-config
-      pkgs.darwin.apple_sdk.frameworks.Security
-      pkgs.libiconv
-    ];
-    # Clobber buildInputs (poetry2nix often puts it here)
-    buildInputs = [
-      pkgs.openssl
-      pkgs.darwin.apple_sdk.frameworks.Security
-      pkgs.libiconv
-    ];
+    nativeBuildInputs = [ pkgs.pkg-config pkgs.darwin.apple_sdk.frameworks.Security pkgs.libiconv ];
+    buildInputs = [ pkgs.openssl pkgs.darwin.apple_sdk.frameworks.Security pkgs.libiconv ];
   });
 
   cffi = prev.cffi.overridePythonAttrs (old: {
-    nativeBuildInputs = [
-      pkgs.pkg-config
-      pkgs.libffi
-    ];
-    buildInputs = [
-      pkgs.libffi
-    ];
+    nativeBuildInputs = [ pkgs.pkg-config pkgs.libffi ];
+    buildInputs = [ pkgs.libffi ];
   });
 
-  # PyOpenSSL usually pure python but sometimes gets the framework injected
   pyopenssl = prev.pyopenssl.overridePythonAttrs (old: {
     nativeBuildInputs = [];
     buildInputs = [ pkgs.darwin.apple_sdk.frameworks.Security ];
   });
   
   keyring = prev.keyring.overridePythonAttrs (old: {
-    nativeBuildInputs = [
-      pkgs.darwin.apple_sdk.frameworks.Security
-      pkgs.darwin.apple_sdk.frameworks.CoreFoundation
-    ];
+    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.CoreFoundation ];
     buildInputs = [];
+  });
+
+  # Fix: Sounddevice / PortAudio usually needs CoreAudio/AudioToolbox
+  sounddevice = prev.sounddevice.overridePythonAttrs (old: {
+    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.CoreAudio pkgs.darwin.apple_sdk.frameworks.AudioToolbox ];
+    buildInputs = [ pkgs.portaudio ];
+  });
+
+  # Fix: Pyperclip might try to use Foundation/AppKit
+  pyperclip = prev.pyperclip.overridePythonAttrs (old: {
+    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.Foundation pkgs.darwin.apple_sdk.frameworks.AppKit ];
+  });
+
+  # Fix: NumPy often needs Accelerate
+  numpy = prev.numpy.overridePythonAttrs (old: {
+    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
+    buildInputs = [];
+  });
+
+  # Fix: Rust-based packages needing Security framework
+  tiktoken = prev.tiktoken.overridePythonAttrs (old: {
+    nativeBuildInputs = [ 
+      pkgs.cargo pkgs.rustc pkgs.rustPlatform.cargoSetupHook pkgs.rustPlatform.maturinBuildHook 
+      pkgs.darwin.apple_sdk.frameworks.Security 
+    ];
+  });
+  
+  tokenizers = prev.tokenizers.overridePythonAttrs (old: {
+    nativeBuildInputs = [ 
+      pkgs.cargo pkgs.rustc pkgs.rustPlatform.cargoSetupHook pkgs.rustPlatform.maturinBuildHook 
+      pkgs.darwin.apple_sdk.frameworks.Security 
+    ];
   });
 
   # Grafted Scipy
   scipy = unstable.python311Packages.scipy;
 
-  # GRAFTED RPDS-PY for Darwin
+  # GRAFTED RPDS-PY
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
     format = "pyproject";
-    
     inherit (unstable.python311Packages.rpds-py) src cargoDeps;
     patches = unstable.python311Packages.rpds-py.patches or [];
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
-
     dontCheckRuntimeDeps = true;
-
     nativeBuildInputs = [
-      unstable.cargo 
-      unstable.rustc 
-      pkgs.rustPlatform.cargoSetupHook
-      unstable.maturin
-      pkgs.pkg-config
-      pkgs.libiconv 
-      pkgs.darwin.apple_sdk.frameworks.Security 
-      pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+      unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin pkgs.pkg-config
+      pkgs.libiconv pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
     ];
     buildInputs = [ pkgs.libiconv ];
-
     buildPhase = ''
       export CARGO_HOME=$PWD/.cargo
       maturin build --jobs=$NIX_BUILD_CORES --frozen --release --strip --manylinux off
