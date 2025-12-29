@@ -5,10 +5,10 @@ let
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 
-  # SAFE SDK: Point to the current default SDK frameworks
+  # SAFE SDK
   frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-  # HELPER: Clobber C-extension inputs to remove 'apple_sdk_11_0' poison
+  # HELPER: Clobber C-extension inputs
   fixDarwinSDK = pkg: extraNative: extraBuild: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.pkg-config pkgs.libiconv ] ++ extraNative;
     buildInputs = [ pkgs.libiconv ] ++ extraBuild;
@@ -29,13 +29,11 @@ in
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
   google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
   google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
-  google-crc32c = let
-    patched = prev.google-crc32c.overridePythonAttrs googleFix;
-  in fixDarwinSDK patched [] [];
+  # google-crc32c handled via fixDarwinSDK below
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy Tools Overrides
+  # Dummy Tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -95,6 +93,11 @@ in
     [ pkgs.cmake pkgs.ninja frameworks.CoreFoundation ] 
     [ pkgs.openssl pkgs.zlib frameworks.CoreFoundation ];
   grpcio-status = fixDarwinSDK prev.grpcio-status [] [];
+  
+  # Correct way to combine license fix + SDK fix
+  google-crc32c = let
+    patched = prev.google-crc32c.overridePythonAttrs googleFix;
+  in fixDarwinSDK patched [] [];
 
   # AIOHTTP Stack
   aiohttp = fixDarwinSDK prev.aiohttp [] [];
@@ -102,7 +105,13 @@ in
   yarl = fixDarwinSDK prev.yarl [] [];
   frozenlist = fixDarwinSDK prev.frozenlist [] [];
   aiosignal = fixDarwinSDK prev.aiosignal [] [];
-  brotli = fixDarwinSDK prev.brotli [] []; # Used by aiohttp/urllib3
+  brotli = fixDarwinSDK prev.brotli [] [];
+
+  # Web/Async Stack (New Fixes)
+  tornado = fixDarwinSDK prev.tornado [] [];
+  pyzmq = fixDarwinSDK prev.pyzmq [ pkgs.zeromq ] [ pkgs.zeromq ]; # Uses system zeromq usually
+  wrapt = fixDarwinSDK prev.wrapt [] [];
+  msgpack = fixDarwinSDK prev.msgpack [] [];
 
   # Pillow
   pillow = fixDarwinSDK prev.pillow 
@@ -117,19 +126,21 @@ in
   sounddevice = fixDarwinSDK prev.sounddevice 
     [ frameworks.CoreAudio frameworks.AudioToolbox ] 
     [ pkgs.portaudio ];
+  
+  # Git Stack (New Fixes)
+  gitpython = fixDarwinSDK prev.gitpython [] [];
+  gitdb = fixDarwinSDK prev.gitdb [] [];
+  smmap = fixDarwinSDK prev.smmap [] [];
 
   # Data / Formats
   numpy = fixDarwinSDK prev.numpy [ frameworks.Accelerate ] [];
   pyyaml = fixDarwinSDK prev.pyyaml [] [];
   markupsafe = fixDarwinSDK prev.markupsafe [] [];
-  pandas = fixDarwinSDK prev.pandas [] []; # Often pure, but poetry2nix might mess it up
-  pyarrow = fixDarwinSDK prev.pyarrow 
-    [ pkgs.cmake pkgs.ninja ] 
-    [ pkgs.arrow-cpp ]; # Heavy C++ dep
-  protobuf = fixDarwinSDK prev.protobuf 
-    [ pkgs.cmake ] 
-    [ pkgs.protobuf ]; # Uses system protobuf usually
-  
+  pandas = fixDarwinSDK prev.pandas [] [];
+  pyarrow = fixDarwinSDK prev.pyarrow [ pkgs.cmake pkgs.ninja ] [ pkgs.arrow-cpp ];
+  protobuf = fixDarwinSDK prev.protobuf [ pkgs.cmake ] [ pkgs.protobuf ];
+  lxml = fixDarwinSDK prev.lxml [ pkgs.libxml2 pkgs.libxslt ] [ pkgs.libxml2 pkgs.libxslt ]; # Heavy C dep
+
   # Rust / Maturin Stack
   pydantic-core = fixRustSDK prev.pydantic-core 
     [ frameworks.Security frameworks.SystemConfiguration frameworks.CoreFoundation ];
