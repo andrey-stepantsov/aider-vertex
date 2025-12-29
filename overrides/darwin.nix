@@ -5,16 +5,20 @@ let
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 
-  # SAFE SDK
+  # SAFE SDK SOURCE:
+  # Points to the current default SDK frameworks in Nixpkgs Unstable.
+  # This bypasses the deprecated 'apple_sdk_11_0' aliases that cause crashes.
   frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-  # HELPER: Clobber C-extension inputs
+  # HELPER: Clobber C-extension inputs.
+  # This completely overwrites nativeBuildInputs/buildInputs to remove
+  # any poisoned defaults injected by poetry2nix.
   fixDarwinSDK = pkg: extraNative: extraBuild: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.pkg-config pkgs.libiconv ] ++ extraNative;
     buildInputs = [ pkgs.libiconv ] ++ extraBuild;
   });
 
-  # HELPER: Clobber Rust/Maturin inputs
+  # HELPER: Clobber Rust/Maturin inputs.
   fixRustSDK = pkg: extraFrameworks: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ 
       unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
@@ -29,11 +33,10 @@ in
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
   google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
   google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
-  # google-crc32c handled via fixDarwinSDK below
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy Tools
+  # --- DUMMY TOOLS (Required for builds that still trigger) ---
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -80,8 +83,8 @@ in
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # --- MASSIVE SDK DEPRECATION CLEANUP ---
-  
+  # --- MASSIVE SDK CLEANUP (Removing deprecated apple_sdk_11_0) ---
+
   # Cryptography Stack
   cryptography = fixDarwinSDK prev.cryptography [ frameworks.Security ] [ pkgs.openssl frameworks.Security ];
   cffi = fixDarwinSDK prev.cffi [ pkgs.libffi ] [ pkgs.libffi ];
@@ -94,7 +97,7 @@ in
     [ pkgs.openssl pkgs.zlib frameworks.CoreFoundation ];
   grpcio-status = fixDarwinSDK prev.grpcio-status [] [];
   
-  # Correct way to combine license fix + SDK fix
+  # Combined fix for google-crc32c (License fix + SDK fix)
   google-crc32c = let
     patched = prev.google-crc32c.overridePythonAttrs googleFix;
   in fixDarwinSDK patched [] [];
@@ -107,9 +110,9 @@ in
   aiosignal = fixDarwinSDK prev.aiosignal [] [];
   brotli = fixDarwinSDK prev.brotli [] [];
 
-  # Web/Async Stack (New Fixes)
+  # Web/Async Stack
   tornado = fixDarwinSDK prev.tornado [] [];
-  pyzmq = fixDarwinSDK prev.pyzmq [ pkgs.zeromq ] [ pkgs.zeromq ]; # Uses system zeromq usually
+  pyzmq = fixDarwinSDK prev.pyzmq [ pkgs.zeromq ] [ pkgs.zeromq ];
   wrapt = fixDarwinSDK prev.wrapt [] [];
   msgpack = fixDarwinSDK prev.msgpack [] [];
 
@@ -122,12 +125,15 @@ in
   psutil = fixDarwinSDK prev.psutil 
     [ frameworks.IOKit frameworks.CoreFoundation ] 
     [ frameworks.IOKit frameworks.CoreFoundation ];
-  pyperclip = fixDarwinSDK prev.pyperclip [ frameworks.Foundation frameworks.AppKit ] [];
+  
+  # Pyperclip: Removed SDK inputs to avoid confusion, let it be pure python/system call based
+  pyperclip = fixDarwinSDK prev.pyperclip [] [];
+  
   sounddevice = fixDarwinSDK prev.sounddevice 
     [ frameworks.CoreAudio frameworks.AudioToolbox ] 
     [ pkgs.portaudio ];
   
-  # Git Stack (New Fixes)
+  # Git Stack
   gitpython = fixDarwinSDK prev.gitpython [] [];
   gitdb = fixDarwinSDK prev.gitdb [] [];
   smmap = fixDarwinSDK prev.smmap [] [];
@@ -139,14 +145,18 @@ in
   pandas = fixDarwinSDK prev.pandas [] [];
   pyarrow = fixDarwinSDK prev.pyarrow [ pkgs.cmake pkgs.ninja ] [ pkgs.arrow-cpp ];
   protobuf = fixDarwinSDK prev.protobuf [ pkgs.cmake ] [ pkgs.protobuf ];
-  lxml = fixDarwinSDK prev.lxml [ pkgs.libxml2 pkgs.libxslt ] [ pkgs.libxml2 pkgs.libxslt ]; # Heavy C dep
+  lxml = fixDarwinSDK prev.lxml [ pkgs.libxml2 pkgs.libxslt ] [ pkgs.libxml2 pkgs.libxslt ];
 
   # Rust / Maturin Stack
   pydantic-core = fixRustSDK prev.pydantic-core 
     [ frameworks.Security frameworks.SystemConfiguration frameworks.CoreFoundation ];
   tiktoken = fixRustSDK prev.tiktoken [ frameworks.Security ];
   tokenizers = fixRustSDK prev.tokenizers [ frameworks.Security ];
-  watchfiles = fixRustSDK prev.watchfiles [ frameworks.CoreServices ];
+  
+  # Watchfiles uses Rust (maturin) + CoreServices
+  watchfiles = let
+    base = fixRustSDK prev.watchfiles [ frameworks.CoreServices ];
+  in base.overridePythonAttrs (old: { preferWheel = true; });
 
   # --- GRAFTED SCIPY ---
   scipy = unstable.python311Packages.scipy;
