@@ -62,22 +62,30 @@ in
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # Fix: Override cryptography to use modern Security framework (fixing deprecated SDK crash)
+  # Fix: Overwrite nativeBuildInputs to remove poetry2nix's default SDK 11.0 injection
   cryptography = prev.cryptography.overridePythonAttrs (old: {
-    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+    nativeBuildInputs = [
+      pkgs.pkg-config
       pkgs.darwin.apple_sdk.frameworks.Security
       pkgs.libiconv
     ];
+    buildInputs = (old.buildInputs or []) ++ [ pkgs.darwin.apple_sdk.frameworks.Security ];
   });
 
-  # Fix: Override cffi to use modern libffi and frameworks (fixing deprecated SDK crash)
+  # Fix: Overwrite nativeBuildInputs
   cffi = prev.cffi.overridePythonAttrs (old: {
-    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+    nativeBuildInputs = [
       pkgs.pkg-config
       pkgs.libffi
     ];
-    buildInputs = (old.buildInputs or []) ++ [
-      pkgs.libffi
+    buildInputs = (old.buildInputs or []) ++ [ pkgs.libffi ];
+  });
+  
+  # Fix: Keyring uses Security framework
+  keyring = prev.keyring.overridePythonAttrs (old: {
+    nativeBuildInputs = [
+      pkgs.darwin.apple_sdk.frameworks.Security
+      pkgs.darwin.apple_sdk.frameworks.CoreFoundation
     ];
   });
 
