@@ -75,8 +75,10 @@ in {
   });
 
   # GRAFTED RPDS-PY
-  # Replaced poetry derivation with standard buildPythonPackage.
-  # UPDATED: Using UNSTABLE build tools to support newer pyproject.toml syntax.
+  # Strategy: Clean Build + Hybrid Toolchain
+  # - Stable Environment (pkgs.python311Packages)
+  # - Unstable Source (src, cargoDeps, patches)
+  # - Hybrid Tools: Unstable Compiler + Stable Hooks + Unstable Maturin Binary
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
@@ -90,8 +92,10 @@ in {
     nativeBuildInputs = [
       unstable.cargo 
       unstable.rustc 
-      unstable.rustPlatform.cargoSetupHook 
-      unstable.rustPlatform.maturinBuildHook 
+      # Use Stable hooks to avoid shell script errors (concatTo not found)
+      pkgs.rustPlatform.cargoSetupHook 
+      # Use Stable hook logic but inject Unstable binary to support new pyproject.toml
+      (pkgs.rustPlatform.maturinBuildHook.override { maturin = unstable.maturin; }) 
       pkgs.pkg-config
     ];
   };

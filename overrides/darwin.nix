@@ -40,7 +40,7 @@ final: prev:
   });
 
   # GRAFTED RPDS-PY for Darwin
-  # Clean build strategy with UNSTABLE tools
+  # Strategy: Clean Build + Hybrid Toolchain
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
@@ -54,8 +54,9 @@ final: prev:
     nativeBuildInputs = [
       unstable.cargo 
       unstable.rustc 
-      unstable.rustPlatform.cargoSetupHook 
-      unstable.rustPlatform.maturinBuildHook 
+      # Stable hooks + Unstable binary override
+      pkgs.rustPlatform.cargoSetupHook 
+      (pkgs.rustPlatform.maturinBuildHook.override { maturin = unstable.maturin; })
       pkgs.pkg-config
       pkgs.libiconv 
       pkgs.darwin.apple_sdk.frameworks.Security 
