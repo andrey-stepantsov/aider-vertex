@@ -5,9 +5,10 @@ let
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 
-  # Define a safe, explicit SDK to avoid "apple_sdk_11_0 has been removed" errors.
-  # We access frameworks from here instead of pkgs.darwin.apple_sdk
-  frameworks = pkgs.darwin.apple_sdk_12_3.frameworks;
+  # Use the default SDK frameworks. 
+  # We avoid specific versions like 11_0 or 12_3 because they are being removed from Unstable.
+  # "pkgs.darwin.apple_sdk.frameworks" should point to the current valid SDK.
+  frameworks = pkgs.darwin.apple_sdk.frameworks;
 in
 {
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
@@ -67,7 +68,7 @@ in
   });
 
   # --- SDK DEPRECATION FIXES ---
-  # Explicitly overwrite inputs using 'frameworks' (SDK 12.3) to purge 11.0 references
+  # Overwrite inputs to purge 'darwin.apple_sdk_11_0' from poetry2nix defaults
 
   cryptography = prev.cryptography.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.pkg-config frameworks.Security pkgs.libiconv ];
@@ -155,4 +156,7 @@ in
       mv target/wheels/*.whl dist/
     '';
   };
+  
+  # Also fix watchfiles buildPhase to match rpds-py strategy
+  watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
 }
