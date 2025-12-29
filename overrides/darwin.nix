@@ -5,14 +5,13 @@ let
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 
-  # FORCE NEW SDK: Explicitly use 14.0 to avoid any 11.0/12.3 deprecation aliases
-  # If 14.0 doesn't exist, we might fail evaluation, but at least we escape 11.0.
-  # Fallback to apple_sdk if 14_0 is missing (but it should be there in Unstable).
-  frameworks = if (builtins.hasAttr "apple_sdk_14_0" pkgs.darwin) 
-               then pkgs.darwin.apple_sdk_14_0.frameworks 
-               else pkgs.darwin.apple_sdk.frameworks;
+  # SAFE SDK SOURCE:
+  # Points to the current default SDK frameworks in Nixpkgs Unstable.
+  frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-  # HELPER: Clobber ALL inputs including propagated ones to remove poison
+  # HELPER: Clobber C-extension inputs.
+  # This completely overwrites nativeBuildInputs/buildInputs to remove
+  # any poisoned defaults injected by poetry2nix.
   fixDarwinSDK = pkg: extraNative: extraBuild: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.pkg-config pkgs.libiconv ] ++ extraNative;
     buildInputs = [ pkgs.libiconv ] ++ extraBuild;
@@ -20,29 +19,37 @@ let
     propagatedBuildInputs = []; 
   });
 
-  # HELPER: Clobber Rust/Maturin inputs
+  # HELPER: Apply googleFix AND fixDarwinSDK
+  # This ensures both the license patch AND the SDK cleanup are applied.
+  fixGoogle = pkg: fixDarwinSDK (pkg.overridePythonAttrs googleFix) [] [];
+
+  # HELPER: Clobber Rust/Maturin inputs.
   fixRustSDK = pkg: extraFrameworks: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ 
       unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
       pkgs.pkg-config pkgs.libiconv 
     ] ++ extraFrameworks;
     buildInputs = [ pkgs.libiconv ] ++ extraFrameworks;
-    propagatedBuildInputs = []; 
+    propagatedBuildInputs = [];
   });
 in
 {
-  google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
-  google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
-  google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
-  google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
-  google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
-  google-crc32c = let
-    patched = prev.google-crc32c.overridePythonAttrs googleFix;
-  in fixDarwinSDK patched [] [];
-  google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
-  google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
+  # --- GOOGLE PACKAGES (License Fix + SDK Fix) ---
+  google-cloud-aiplatform = fixGoogle prev.google-cloud-aiplatform;
+  google-cloud-storage = fixGoogle prev.google-cloud-storage;
+  google-cloud-core = fixGoogle prev.google-cloud-core;
+  google-api-core = fixGoogle prev.google-api-core;
+  google-resumable-media = fixGoogle prev.google-resumable-media;
+  google-cloud-resource-manager = fixGoogle prev.google-cloud-resource-manager;
+  google-cloud-bigquery = fixGoogle prev.google-cloud-bigquery;
+  google-crc32c = fixGoogle prev.google-crc32c;
+  
+  # Additional Google packages found in error logs
+  google-ai-generativelanguage = fixDarwinSDK prev.google-ai-generativelanguage [] [];
+  google-generativeai = fixDarwinSDK prev.google-generativeai [] [];
+  googleapis-common-protos = fixDarwinSDK prev.googleapis-common-protos [] [];
 
-  # Dummy Tools
+  # --- DUMMY TOOLS ---
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
