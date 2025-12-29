@@ -1,6 +1,9 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
+  # Wrap unstable binaries to look like Python packages
+  # Note: Since 'pkgs' is now Unstable on Mac, pkgs.meson is essentially unstable.meson.
+  # But we keep this explicit wrap to be safe.
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in
@@ -14,6 +17,7 @@ in
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
+  # Dummy tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -51,21 +55,23 @@ in
     propagatedBuildInputs = [ cleanNinjaBinary ];
   };
 
+  # Inject dummy ninja
   pybind11 = prev.pybind11.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
   });
 
+  # Ensure meson-python finds dummy meson
   meson-python = prev.meson-python.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # Grafted Scipy (Binary from Unstable)
+  # GRAFTED SCIPY (Unstable Binary)
   scipy = unstable.python311Packages.scipy;
 
   # GRAFTED RPDS-PY for Darwin
-  # Fix: Use unstable.python311Packages to match the Python version of the grafted SciPy
-  rpds-py = unstable.python311Packages.buildPythonPackage {
+  # 'pkgs' is now Unstable, so this builds with Python 3.11.14 automatically.
+  rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
     format = "pyproject";

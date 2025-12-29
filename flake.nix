@@ -17,11 +17,21 @@
     in {
       packages = forAllSystems (system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
-          unstable = nixpkgs-unstable.legacyPackages.${system};
+          # Define both package sets
+          stablePkgs = nixpkgs.legacyPackages.${system};
+          unstablePkgs = nixpkgs-unstable.legacyPackages.${system};
+          
+          # STRATEGIC SPLIT:
+          # On Linux: Use Stable packages + Stable Python (3.11.10).
+          # On macOS: Use Unstable packages + Unstable Python (3.11.14) to match the grafted SciPy binary.
+          pkgs = if stablePkgs.stdenv.isDarwin then unstablePkgs else stablePkgs;
+          
+          # We still need access to 'unstable' for overrides, but now 'pkgs' itself might BE unstable on Mac.
+          # To avoid confusion in overrides, we pass 'unstablePkgs' explicitly as 'unstable'.
+          
+          # Initialize poetry2nix with the CHOSEN package set (Stable on Linux, Unstable on Mac)
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
           
-          # Fix Google Cloud license issue
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -31,18 +41,14 @@
             '';
           };
 
-          # Select the Python interpreter:
-          # On macOS, we MUST use Unstable Python because we are grafting the Unstable SciPy binary.
-          # On Linux, we stick to Stable Python.
-          pythonInterpreter = if pkgs.stdenv.isDarwin 
-            then unstable.python311 
-            else pkgs.python311;
-
-          myOverrides = import ./overrides.nix { inherit pkgs googleFix unstable; };
+          myOverrides = import ./overrides.nix { 
+            inherit pkgs googleFix; 
+            unstable = unstablePkgs; 
+          };
         in {
           default = p2n.mkPoetryApplication {
             projectDir = ./.;
-            python = pythonInterpreter;
+            python = pkgs.python311; # This will be 3.11.10 on Linux, 3.11.14 on Mac
             preferWheels = true;
             nativeBuildInputs = [ pkgs.makeWrapper ];
             overrides = p2n.defaultPoetryOverrides.extend myOverrides;
