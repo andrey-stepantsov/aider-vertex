@@ -39,8 +39,9 @@
             # Pass stable as "unstable" to match the overrides signature
             unstable = pkgs; 
           };
-        in {
-          default = p2n.mkPoetryApplication {
+
+          # The main application derivation
+          app = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
             preferWheels = true;
@@ -50,6 +51,43 @@
               wrapProgram $out/bin/aider-vertex \
                 --set PYTHONUTF8 1 --set LC_ALL C.UTF-8 --set LANG C.UTF-8
             '';
+          };
+
+        in {
+          default = app;
+
+          # --- NEW DOCKER OUTPUT ---
+          docker = pkgs.dockerTools.buildLayeredImage {
+            name = "aider-vertex";
+            tag = "latest";
+            
+            # The exact same 'app' we built above is placed inside the container
+            contents = [ 
+              app 
+              pkgs.cacert    # Required for HTTPS (Vertex AI API calls)
+              pkgs.coreutils # Basic tools (mkdir, ls, etc.)
+              pkgs.bash      # Shell for debugging
+            ];
+
+            # Optimization: Create standard paths to avoid "command not found" in rare cases
+            fakeRootCommands = ''
+              mkdir -p /tmp
+              chmod 1777 /tmp
+              mkdir -p /usr/bin
+              ln -s ${pkgs.coreutils}/bin/env /usr/bin/env
+            '';
+
+            config = {
+              Cmd = [ "${app}/bin/aider-vertex" ];
+              WorkingDir = "/data";
+              Volumes = { "/data" = {}; };
+              Env = [
+                "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+                "PYTHONUTF8=1"
+                "LC_ALL=C.UTF-8"
+                "LANG=C.UTF-8"
+              ];
+            };
           };
         });
 
