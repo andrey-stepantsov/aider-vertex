@@ -13,7 +13,7 @@ jobs:
   check-build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest] 
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -32,10 +32,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install System Dependencies
-        # CentOS 7 repos are archived; we might need to fix mirror lists or just install basics.
-        # 'xz' is required for Nix installation. 'git' is required for flakes.
-        run: yum -y install curl xz git sudo
+      - name: Fix CentOS 7 EOL Repos & Install Deps
+        run: |
+          # 1. Point yum to the vault archive (since mirrors are dead)
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+          
+          # 2. Install dependencies
+          yum -y install curl xz git sudo
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v9
