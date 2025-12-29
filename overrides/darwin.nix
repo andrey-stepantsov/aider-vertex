@@ -1,19 +1,20 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
+  # Wrap unstable binaries to look like Python packages
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
-  
+
+  # SAFE SDK: Point to the current default SDK frameworks
   frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-  # Helper to sanitise SDK inputs. 
-  # It effectively wipes out whatever poetry2nix added and sets safe defaults.
+  # HELPER: Clobber C-extension inputs to remove 'apple_sdk_11_0' poison
   fixDarwinSDK = pkg: extraNative: extraBuild: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.pkg-config pkgs.libiconv ] ++ extraNative;
     buildInputs = [ pkgs.libiconv ] ++ extraBuild;
   });
 
-  # Helper for Rust/Maturin packages
+  # HELPER: Clobber Rust/Maturin inputs
   fixRustSDK = pkg: extraFrameworks: pkg.overridePythonAttrs (old: {
     nativeBuildInputs = [ 
       unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
@@ -21,7 +22,6 @@ let
     ] ++ extraFrameworks;
     buildInputs = [ pkgs.libiconv ] ++ extraFrameworks;
   });
-
 in
 {
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
@@ -33,6 +33,7 @@ in
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
+  # Dummy Tools Overrides
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -79,57 +80,58 @@ in
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # --- SDK FIXES ---
+  # --- MASSIVE SDK DEPRECATION CLEANUP ---
   
-  cryptography = fixDarwinSDK prev.cryptography 
-    [ frameworks.Security ] 
-    [ pkgs.openssl frameworks.Security ];
-
-  cffi = fixDarwinSDK prev.cffi 
-    [ pkgs.libffi ] 
-    [ pkgs.libffi ];
-
+  # Cryptography Stack
+  cryptography = fixDarwinSDK prev.cryptography [ frameworks.Security ] [ pkgs.openssl frameworks.Security ];
+  cffi = fixDarwinSDK prev.cffi [ pkgs.libffi ] [ pkgs.libffi ];
   pyopenssl = fixDarwinSDK prev.pyopenssl [] [ frameworks.Security ];
-  
-  keyring = fixDarwinSDK prev.keyring 
-    [ frameworks.Security frameworks.CoreFoundation ] [];
+  keyring = fixDarwinSDK prev.keyring [ frameworks.Security frameworks.CoreFoundation ] [];
 
+  # Networking / Google Stack
+  grpcio = fixDarwinSDK prev.grpcio 
+    [ pkgs.cmake pkgs.ninja frameworks.CoreFoundation ] 
+    [ pkgs.openssl pkgs.zlib frameworks.CoreFoundation ];
+  grpcio-status = fixDarwinSDK prev.grpcio-status [] [];
+  google-crc32c = fixDarwinSDK prev.google-crc32c [] [];
+
+  # AIOHTTP Stack (New Fixes)
+  aiohttp = fixDarwinSDK prev.aiohttp [] [];
+  multidict = fixDarwinSDK prev.multidict [] [];
+  yarl = fixDarwinSDK prev.yarl [] [];
+  frozenlist = fixDarwinSDK prev.frozenlist [] [];
+  aiosignal = fixDarwinSDK prev.aiosignal [] [];
+
+  # Pillow (New Fix) - Explicitly providing libs to avoid it searching and finding bad SDK
+  pillow = fixDarwinSDK prev.pillow 
+    [ pkgs.pkg-config ] 
+    [ pkgs.libjpeg pkgs.zlib pkgs.libtiff pkgs.freetype pkgs.libwebp pkgs.openjpeg pkgs.libxcrypt ];
+
+  # System Interaction
   psutil = fixDarwinSDK prev.psutil 
     [ frameworks.IOKit frameworks.CoreFoundation ] 
     [ frameworks.IOKit frameworks.CoreFoundation ];
-
+  pyperclip = fixDarwinSDK prev.pyperclip [ frameworks.Foundation frameworks.AppKit ] [];
   sounddevice = fixDarwinSDK prev.sounddevice 
     [ frameworks.CoreAudio frameworks.AudioToolbox ] 
     [ pkgs.portaudio ];
 
-  pyperclip = fixDarwinSDK prev.pyperclip 
-    [ frameworks.Foundation frameworks.AppKit ] [];
-
-  numpy = fixDarwinSDK prev.numpy 
-    [ frameworks.Accelerate ] [];
-
-  # Fix Rust/Maturin packages
-  # Pydantic-core is a prime suspect for using Security framework defaults
-  pydantic-core = fixRustSDK prev.pydantic-core 
-    [ frameworks.Security frameworks.SystemConfiguration frameworks.CoreFoundation ];
-
-  tiktoken = fixRustSDK prev.tiktoken 
-    [ frameworks.Security ];
-  
-  tokenizers = fixRustSDK prev.tokenizers 
-    [ frameworks.Security ];
-
-  watchfiles = fixRustSDK prev.watchfiles 
-    [ frameworks.CoreServices ];
-
-  # Fix C-extension packages
+  # Data / Formats
+  numpy = fixDarwinSDK prev.numpy [ frameworks.Accelerate ] [];
   pyyaml = fixDarwinSDK prev.pyyaml [] [];
   markupsafe = fixDarwinSDK prev.markupsafe [] [];
+  
+  # Rust / Maturin Stack
+  pydantic-core = fixRustSDK prev.pydantic-core 
+    [ frameworks.Security frameworks.SystemConfiguration frameworks.CoreFoundation ];
+  tiktoken = fixRustSDK prev.tiktoken [ frameworks.Security ];
+  tokenizers = fixRustSDK prev.tokenizers [ frameworks.Security ];
+  watchfiles = fixRustSDK prev.watchfiles [ frameworks.CoreServices ];
 
-  # Grafted Scipy
+  # --- GRAFTED SCIPY ---
   scipy = unstable.python311Packages.scipy;
 
-  # GRAFTED RPDS-PY
+  # --- GRAFTED RPDS-PY ---
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
