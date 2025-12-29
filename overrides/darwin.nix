@@ -15,7 +15,7 @@ in
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy tools
+  # Dummy tools - Still needed for pybind11 and others that might try to build
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -62,7 +62,9 @@ in
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # Fix: Overwrite nativeBuildInputs to remove poetry2nix's default SDK 11.0 injection
+  # --- SDK DEPRECATION FIXES ---
+  # Overwrite nativeBuildInputs to remove poetry2nix's default injection of 'darwin.apple_sdk_11_0'
+
   cryptography = prev.cryptography.overridePythonAttrs (old: {
     nativeBuildInputs = [
       pkgs.pkg-config
@@ -72,7 +74,6 @@ in
     buildInputs = (old.buildInputs or []) ++ [ pkgs.darwin.apple_sdk.frameworks.Security ];
   });
 
-  # Fix: Overwrite nativeBuildInputs
   cffi = prev.cffi.overridePythonAttrs (old: {
     nativeBuildInputs = [
       pkgs.pkg-config
@@ -80,8 +81,13 @@ in
     ];
     buildInputs = (old.buildInputs or []) ++ [ pkgs.libffi ];
   });
+
+  pyopenssl = prev.pyopenssl.overridePythonAttrs (old: {
+    nativeBuildInputs = [
+      pkgs.darwin.apple_sdk.frameworks.Security
+    ];
+  });
   
-  # Fix: Keyring uses Security framework
   keyring = prev.keyring.overridePythonAttrs (old: {
     nativeBuildInputs = [
       pkgs.darwin.apple_sdk.frameworks.Security
@@ -89,10 +95,16 @@ in
     ];
   });
 
-  # Grafted Scipy
-  scipy = unstable.python311Packages.scipy;
+  # --- SCIPY FIX ---
+  # Force use of Wheel. Source build is too fragile on macOS runner.
+  scipy = prev.scipy.overridePythonAttrs (old: {
+    preferWheel = true;
+    # Clear build inputs to ensure we don't accidentally try to compile
+    nativeBuildInputs = [];
+    buildInputs = [];
+  });
 
-  # GRAFTED RPDS-PY for Darwin
+  # --- RPDS-PY FIX ---
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
