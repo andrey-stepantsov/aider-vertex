@@ -28,26 +28,29 @@ jobs:
   verify-centos:
     name: "Runtime Check (CentOS 7)"
     runs-on: ubuntu-latest
-    container: centos:7
     steps:
       - uses: actions/checkout@v4
       
-      - name: Fix CentOS 7 EOL Repos & Install Deps
+      - name: Build & Run inside CentOS 7
         run: |
-          # 1. Point yum to the vault archive (since mirrors are dead)
-          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
-          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
-          
-          # 2. Install dependencies
-          yum -y install curl xz git sudo
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v9
-        with:
-          init: none 
-          extra-conf: |
-            experimental-features = nix-command flakes
-
-      - name: Build & Run on CentOS
-        # "nix run" builds the package and immediately executes the binary
-        run: nix run . -- --version
+          # Run inside a clean CentOS 7 container to verify compatibility
+          # We manually invoke docker to avoid GitHub Actions' Node.js dependency issues
+          docker run --rm -v $(pwd):/src -w /src centos:7 bash -c "
+            set -e
+            
+            echo '>>> Fixing EOL Repositories...'
+            sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+            sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+            
+            echo '>>> Installing System Dependencies...'
+            yum -y install curl xz git sudo
+            
+            echo '>>> Installing Nix...'
+            curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install linux --init none --no-confirm
+            
+            # Load Nix environment
+            . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+            
+            echo '>>> Running Verification...'
+            nix run . -- --version
+          "
