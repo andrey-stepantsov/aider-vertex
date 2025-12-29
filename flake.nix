@@ -56,7 +56,7 @@
         in {
           default = app;
 
-          # --- NEW DOCKER OUTPUT ---
+          # --- DOCKER OUTPUT ---
           docker = pkgs.dockerTools.buildLayeredImage {
             name = "aider-vertex";
             tag = "latest";
@@ -78,7 +78,8 @@
             '';
 
             config = {
-              Cmd = [ "${app}/bin/aider-vertex" ];
+              # FIX: Use Entrypoint so arguments like '--version' are appended, not replaced
+              Entrypoint = [ "${app}/bin/aider-vertex" ];
               WorkingDir = "/data";
               Volumes = { "/data" = {}; };
               Env = [
