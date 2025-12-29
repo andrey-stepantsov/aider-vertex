@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-    # Optional: Also publish when you create a release tag (e.g., v1.0.0)
+    # Publish when you create a release tag (e.g., v1.0.0)
     tags:
       - 'v*'
   workflow_dispatch:
@@ -39,14 +39,21 @@ jobs:
 
       - name: Tag and Push
         run: |
-          # The image comes out of Nix tagged as 'aider-vertex:latest'
-          # We need to re-tag it for the registry
-          
           # Convert repository name to lowercase (Docker requirement)
           IMAGE_ID=ghcr.io/${{ github.repository }}
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
           
-          echo "Pushing to $IMAGE_ID"
+          echo "Base Image ID: $IMAGE_ID"
           
+          # 1. Always push 'latest'
+          echo "Pushing: $IMAGE_ID:latest"
           docker tag aider-vertex:latest $IMAGE_ID:latest
           docker push $IMAGE_ID:latest
+          
+          # 2. If triggered by a git tag (e.g., v1.0.4), push that version too
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            echo "Pushing release version: $VERSION"
+            docker tag aider-vertex:latest $IMAGE_ID:$VERSION
+            docker push $IMAGE_ID:$VERSION
+          fi
