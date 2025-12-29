@@ -1,30 +1,14 @@
-#This vertex model is for alater testing
 #model: vertex_ai/gemini-2.5-flash
-#
-#
-architect: true
 #model: gemini/gemini-3-pro-preview
 model: gemini/gemini-2.5-pro
 editor-model: gemini/gemini-2.5-pro
 weak-model: gemini/gemini-2.5-flash
 
-# The "heavy" check: Runs your script (Verible + Verilator w/ waivers)
-# This ensures code is functionally valid before Aider commits.
-test-cmd: "nix build --extra-experimental-features 'nix-command flakes' --impure" 
-
-# Optional: Run the test command automatically after every edit?
-# Set to 'true' for the most aggressive "intensive loop".
-auto-test: true
-
-# Optional: "Good Cop" linter for instant syntax feedback
-# Only use this if you want to catch missing semicolons BEFORE the test-cmd runs.
-# lint-cmd: ./lint.sh  # REMOVED - already covered by test-cmd
-
-# Appearance & Behavior
-dark-mode: true
-show-diffs: true
-
-# Files to always load into context (Read-Only)
 read:
   - CONVENTIONS.md
-#  - PLAN.md
+
+# Auto-test command: Rebuild the wiki after edits
+test-cmd: "./ci-loop.sh"
+edit-format: whole
+
+

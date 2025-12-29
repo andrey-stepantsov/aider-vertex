@@ -1,48 +1,52 @@
-# Project Build Conventions & Nix Strategy
+# Project Conventions & Architecture
 
 ## Core Philosophy
-This project uses a **hybrid build strategy** via `poetry2nix` to ensure stability across Linux and macOS (Darwin).
+This project uses a **modular Nix Flake** structure to support cross-platform development (macOS and Linux) for a Python application managed by Poetry.
 
-### 1. macOS (Darwin) Strategy: "Force Wheels"
-**Rule:** For complex packages involving C extensions, Rust code, or heavy compilation, we **MUST** force the use of pre-compiled binary wheels.
+## 1. Nix & Flake Structure
+* **Main Entry:** `flake.nix` handles the base environment, `devShells`, and standard packaging logic.
+* **Overrides:** All Python package overrides (fixing build failures, broken metadata, missing wheels) MUST go into `overrides.nix`.
+* **Modularity:** Do not inline massive build logic into `flake.nix` if it can be placed in `overrides.nix`.
 
-* **Why:** Compiling these libraries (e.g., `numpy`, `scipy`, `tiktoken`, `watchfiles`) from source on macOS/Nix is notoriously fragile due to Apple SDK headers, Accelerate framework linking, and Rust toolchain issues.
-* **Mechanism:** In `flake.nix`, we override packages to use `format = "wheel"` or `preferWheel = true` and explicitly provide the `sha256` hash for the macOS binary.
-* **Target Packages:** `numpy`, `scipy`, `shapely`, `tiktoken`, `watchfiles`, `rpds-py`, `hf-xet`, `jiter`.
+## 2. Cross-Platform Rules (CRITICAL)
+* **Do Not Break macOS:** We develop on macOS. Any fix for Linux MUST be guarded by `if pkgs.stdenv.isLinux`.
+* **Hybrid Strategy:**
+    * **macOS:** Prefer wheels (`preferWheel = true`) to avoid compiling heavy Rust/C++ deps locally.
+    * **Linux:** We often need to build from source or fetch specific manylinux wheels manually because `poetry2nix` defaults might fail.
 
-### 2. Linux Strategy: "Source Preference"
-**Rule:** On Linux, we default to building from source (sdist) to leverage Nix's reproducibility capabilities.
+## 3. Package Overrides Guidelines
+When fixing a package in `overrides.nix`:
+* **Hashes:** ALWAYS use **SRI hashes** (Base64, starting with `sha256-`). Do NOT use Hex strings.
+    * *Correct:* `sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`
+    * *Incorrect:* `5b3a5c8089eed498...`
+* **Fetching Wheels:** If `poetry2nix` fails to find a wheel, manually fetch it using `pkgs.fetchPypi` with the exact version, abi, and platform tags found in `poetry.lock`.
+* **Rust Packages:** Packages like `tokenizers`, `rpds-py`, `pydantic-core` often require `nativeBuildInputs` like `rustPlatform.maturinBuildHook` and `cargoDeps` when building from source on Linux.
 
-* **Mechanism:** Standard `poetry2nix` overrides, adding native build inputs like `setuptools`, `maturin`, `cmake`, or `autoPatchelfHook`.
-* **Exceptions:** Pure Python packages that fail to build with `poetry-core` may use wheels unconditionally.
+## 4. The Agentic CI Loop
+We use a custom script to allow AI agents to "see" build failures on GitHub Actions (since we cannot replicate Linux failures locally on macOS).
 
----
+* **Script:** `./ci-loop.sh`
+* **Workflow:**
+    1.  Make changes to `overrides.nix`.
+    2.  Run `./ci-loop.sh` (this commits, pushes to `agent/` branch, and streams logs).
+    3.  Analyze the logs printed to the terminal.
+    4.  Repeat.## 5. Dependency Management Rules (The "Time Travel" Protocol)
+Due to a timeline mismatch between `poetry2nix` (frozen ~April 2025 state) and `nixpkgs-unstable` (containing newer `riscv64` definitions), we strictly adhere to the following:
 
-## Maintenance Guide (The "Fail-Update" Loop)
+### A. The Nixpkgs Pin
+* **Rule:** We pin `nixpkgs` to `nixos-24.05` in `flake.nix`.
+* **Reason:** This ensures the underlying C++ libraries and Rust toolchains are compatible with the expectations of our `poetry2nix` version.
 
-When you update dependencies in `pyproject.toml` / `poetry.lock`, expect the macOS build to fail. This is normal.
+### B. The Lockfile Sanitization
+* **Rule:** NEVER commit `poetry.lock` containing `riscv64` hashes.
+* **Action:** Always update dependencies using the helper script:
+    ```bash
+    ./update-deps.sh
+    ```
+* **Reason:** `poetry2nix` crashes immediately if it encounters these hashes.
 
-**The Update Loop:**
-1.  **Run Build:** `nix build`
-2.  **Catch Mismatch:** The build will fail with `hash mismatch in fixed-output derivation`.
-3.  **Update Hash:**
-    * Copy the `got: sha256-...` hash from the error message.
-    * Update the corresponding package's hash in `flake.nix` (in the `else` / macOS block).
-4.  **Repeat:** Do this until all wheel hashes are updated.
-
----
-
-## Common Package Overrides
-
-| Package | Linux Strategy | macOS Strategy | Reason |
-| :--- | :--- | :--- | :--- |
-| **`tiktoken`** | Build from GitHub source (needs `Cargo.lock`) | **Force Wheel** | Rust build fails on Mac; PyPI sdist lacks lockfile. |
-| **`watchfiles`** | Build from source | **Force Wheel** | Rust compilation issues. |
-| **`numpy` / `scipy`** | Build from source | **Force Wheel** | Compilation is slow & fragile on Mac. |
-| **`google-*`** | Patch metadata (`license-files`) + inject `setuptools` | Same | Build backend compliance issues. |
-| **`regex`** | Patch metadata (`license-files`) | Same | Build backend compliance issues. |
-
-## Troubleshooting
-
-* **`ModuleNotFoundError: No module named 'maturin'`**: You are accidentally trying to build a Rust package from source on macOS. **Stop.** Check `flake.nix` and ensure you are forcing the wheel for that package.
-* **`do not know how to unpack source archive... .whl`**: You are applying a source-build override (like `cargoDeps`) to a binary wheel. Ensure your override logic uses `if pkgs.stdenv.isLinux` correctly.
+### C. Rust/Cargo Compatibility
+* **Rule:** If a Python package with Rust extensions (like `rpds-py`) fails with `lock file version 4 requires...`:
+    1.  Override the package in `overrides.nix`.
+    2.  Add a `postPatch` hook to delete `Cargo.lock`.
+    3.  Define `cargoDeps` manually using `pkgs.rustPlatform.fetchCargoTarball`.

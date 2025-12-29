@@ -1,25 +1,25 @@
 name: "CI Build Check"
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - 'agent/**'  # <--- Add this so the agent can trigger builds
   pull_request:
     branches: [ main ]
+  workflow_dispatch: # <--- Allows manual triggering if needed
 
 jobs:
   check-build:
     strategy:
-      fail-fast: true 
       matrix:
-        # Verify both Linux (CentOS/Ubuntu proxy) and Intel macOS
+        # We verify both, but the agent will focus on the Linux logs
         os: [ubuntu-latest, macos-latest] 
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          # This ensures it doesn't fail if Nix is already there
-          install_url: https://releases.nixos.org/nix/nix-2.24.9/install
       - name: Build Aider-Vertex
         run: nix build . -L
       - name: Verify Logic (Version Check)
