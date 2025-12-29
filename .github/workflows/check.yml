@@ -10,45 +10,54 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest] 
+  universal-check:
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    strategy:
+      # This is the magic setting: If ANY job in the matrix fails, cancel the others immediately.
+      fail-fast: true
+      matrix:
+        include:
+          - name: "Ubuntu (Nix)"
+            os: ubuntu-latest
+            type: standard
+          - name: "macOS (Nix)"
+            os: macos-latest
+            type: standard
+          - name: "CentOS 7 (Legacy Verify)"
+            os: ubuntu-latest # We run on Ubuntu, but spawn a CentOS container
+            type: centos-docker
+
     steps:
       - uses: actions/checkout@v4
+
+      # --- STANDARD NIX BUILD STEPS (Ubuntu & macOS) ---
       - uses: cachix/install-nix-action@v31
+        if: matrix.type == 'standard'
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Aider-Vertex
-        run: nix build . -L
-      - name: Verify Logic (Version Check)
-        run: ./result/bin/aider-vertex --version
 
-  verify-centos:
-    name: "Runtime Check (CentOS 7)"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Build & Run inside CentOS 7
+      - name: Build & Verify (Standard)
+        if: matrix.type == 'standard'
         run: |
-          # Run inside a clean CentOS 7 container to verify compatibility
-          # We manually invoke docker to avoid GitHub Actions' Node.js dependency issues
+          nix build . -L
+          ./result/bin/aider-vertex --version
+
+      # --- CENTOS DOCKER STEP (Legacy Only) ---
+      - name: Build & Run inside CentOS 7
+        if: matrix.type == 'centos-docker'
+        run: |
           docker run --rm -v $(pwd):/src -w /src centos:7 bash -c "
             set -e
-            
             echo '>>> Fixing EOL Repositories...'
             sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
             sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
             
-            echo '>>> Installing System Dependencies...'
+            echo '>>> Installing dependencies...'
             yum -y install curl xz git sudo
             
             echo '>>> Installing Nix...'
             curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install linux --init none --no-confirm
-            
-            # Load Nix environment
             . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
             
             echo '>>> Running Verification...'
