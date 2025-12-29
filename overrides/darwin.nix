@@ -15,7 +15,7 @@ in
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy tools - Still needed for pybind11 and others that might try to build
+  # Dummy tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -63,15 +63,21 @@ in
   });
 
   # --- SDK DEPRECATION FIXES ---
-  # Overwrite nativeBuildInputs to remove poetry2nix's default injection of 'darwin.apple_sdk_11_0'
+  # Overwrite inputs to purge 'darwin.apple_sdk_11_0' from poetry2nix defaults
 
   cryptography = prev.cryptography.overridePythonAttrs (old: {
+    # Clobber nativeBuildInputs
     nativeBuildInputs = [
       pkgs.pkg-config
       pkgs.darwin.apple_sdk.frameworks.Security
       pkgs.libiconv
     ];
-    buildInputs = (old.buildInputs or []) ++ [ pkgs.darwin.apple_sdk.frameworks.Security ];
+    # Clobber buildInputs (poetry2nix often puts it here)
+    buildInputs = [
+      pkgs.openssl
+      pkgs.darwin.apple_sdk.frameworks.Security
+      pkgs.libiconv
+    ];
   });
 
   cffi = prev.cffi.overridePythonAttrs (old: {
@@ -79,13 +85,15 @@ in
       pkgs.pkg-config
       pkgs.libffi
     ];
-    buildInputs = (old.buildInputs or []) ++ [ pkgs.libffi ];
+    buildInputs = [
+      pkgs.libffi
+    ];
   });
 
+  # PyOpenSSL usually pure python but sometimes gets the framework injected
   pyopenssl = prev.pyopenssl.overridePythonAttrs (old: {
-    nativeBuildInputs = [
-      pkgs.darwin.apple_sdk.frameworks.Security
-    ];
+    nativeBuildInputs = [];
+    buildInputs = [ pkgs.darwin.apple_sdk.frameworks.Security ];
   });
   
   keyring = prev.keyring.overridePythonAttrs (old: {
@@ -93,18 +101,13 @@ in
       pkgs.darwin.apple_sdk.frameworks.Security
       pkgs.darwin.apple_sdk.frameworks.CoreFoundation
     ];
-  });
-
-  # --- SCIPY FIX ---
-  # Force use of Wheel. Source build is too fragile on macOS runner.
-  scipy = prev.scipy.overridePythonAttrs (old: {
-    preferWheel = true;
-    # Clear build inputs to ensure we don't accidentally try to compile
-    nativeBuildInputs = [];
     buildInputs = [];
   });
 
-  # --- RPDS-PY FIX ---
+  # Grafted Scipy
+  scipy = unstable.python311Packages.scipy;
+
+  # GRAFTED RPDS-PY for Darwin
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
