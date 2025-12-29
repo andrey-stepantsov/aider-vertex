@@ -18,7 +18,7 @@ Unlike public API keys which may expose your code to training data, Aider-Vertex
 - **No Training:** By default, Google Cloud **does not** use data sent to Vertex AI to train its foundation models.
 - **Enterprise Compliance:** Inherits your Google Cloud Project's data residency (GDPR/HIPAA) and VPC Service Controls.
 
-> **Note on True ZDR:** While Google does not train on your data by default, achieving strict **Zero Data Retention** (where no request logs or caches are stored) requires configuring your [GCP Project settings](https://cloud.google.com/vertex-ai/docs/data-governance) to explicitly disable logging and caching.
+> **Note on True ZDR:** While Google does not train on your data by default, achieving strict **Zero Data Retention** (where no request logs or caches are stored) requires configuring your [GCP Project settings](https://cloud.google.com/vertex-ai/generative-ai/docs/vertex-ai-zero-data-retention) to explicitly disable logging and caching.
 
 ---
 
