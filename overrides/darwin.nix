@@ -1,55 +1,22 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # Wrap unstable binaries to look like Python packages
+  # On stable, we don't need to strip hooks from meson/ninja usually,
+  # but keeping it doesn't hurt.
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
-
-  # SAFE SDK SOURCE:
-  # Points to the current default SDK frameworks in Nixpkgs Unstable.
-  frameworks = pkgs.darwin.apple_sdk.frameworks;
-
-  # HELPER: Clobber C-extension inputs.
-  # This completely overwrites nativeBuildInputs/buildInputs to remove
-  # any poisoned defaults injected by poetry2nix.
-  fixDarwinSDK = pkg: extraNative: extraBuild: pkg.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.pkg-config pkgs.libiconv ] ++ extraNative;
-    buildInputs = [ pkgs.libiconv ] ++ extraBuild;
-    # Aggressively clear propagated inputs to stop the spread of bad SDK dependencies
-    propagatedBuildInputs = []; 
-  });
-
-  # HELPER: Apply googleFix AND fixDarwinSDK
-  # This ensures both the license patch AND the SDK cleanup are applied.
-  fixGoogle = pkg: fixDarwinSDK (pkg.overridePythonAttrs googleFix) [] [];
-
-  # HELPER: Clobber Rust/Maturin inputs.
-  fixRustSDK = pkg: extraFrameworks: pkg.overridePythonAttrs (old: {
-    nativeBuildInputs = [ 
-      unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
-      pkgs.pkg-config pkgs.libiconv 
-    ] ++ extraFrameworks;
-    buildInputs = [ pkgs.libiconv ] ++ extraFrameworks;
-    propagatedBuildInputs = [];
-  });
 in
 {
-  # --- GOOGLE PACKAGES (License Fix + SDK Fix) ---
-  google-cloud-aiplatform = fixGoogle prev.google-cloud-aiplatform;
-  google-cloud-storage = fixGoogle prev.google-cloud-storage;
-  google-cloud-core = fixGoogle prev.google-cloud-core;
-  google-api-core = fixGoogle prev.google-api-core;
-  google-resumable-media = fixGoogle prev.google-resumable-media;
-  google-cloud-resource-manager = fixGoogle prev.google-cloud-resource-manager;
-  google-cloud-bigquery = fixGoogle prev.google-cloud-bigquery;
-  google-crc32c = fixGoogle prev.google-crc32c;
-  
-  # Additional Google packages found in error logs
-  google-ai-generativelanguage = fixDarwinSDK prev.google-ai-generativelanguage [] [];
-  google-generativeai = fixDarwinSDK prev.google-generativeai [] [];
-  googleapis-common-protos = fixDarwinSDK prev.googleapis-common-protos [] [];
+  google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
+  google-cloud-storage = prev.google-cloud-storage.overridePythonAttrs googleFix;
+  google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
+  google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
+  google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
+  google-crc32c = prev.google-crc32c.overridePythonAttrs googleFix;
+  google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
+  google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # --- DUMMY TOOLS ---
+  # Dummy Tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -96,75 +63,22 @@ in
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # --- MASSIVE SDK DEPRECATION CLEANUP ---
-  
-  # Cryptography Stack
-  cryptography = fixDarwinSDK prev.cryptography [ frameworks.Security ] [ pkgs.openssl frameworks.Security ];
-  cffi = fixDarwinSDK prev.cffi [ pkgs.libffi ] [ pkgs.libffi ];
-  pyopenssl = fixDarwinSDK prev.pyopenssl [] [ frameworks.Security ];
-  keyring = fixDarwinSDK prev.keyring [ frameworks.Security frameworks.CoreFoundation ] [];
+  # Fix Scipy
+  scipy = prev.scipy.overridePythonAttrs (old: {
+    preferWheel = true;
+    # FIX: Do not clear inputs. Add tools for fallback source builds.
+    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ 
+      pkgs.gfortran
+      pkgs.pkg-config
+      final.meson 
+      final.ninja 
+    ];
+  });
 
-  # Networking / Google Stack
-  grpcio = fixDarwinSDK prev.grpcio 
-    [ pkgs.cmake pkgs.ninja frameworks.CoreFoundation ] 
-    [ pkgs.openssl pkgs.zlib frameworks.CoreFoundation ];
-  grpcio-status = fixDarwinSDK prev.grpcio-status [] [];
+  # Fix Watchfiles
+  watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
 
-  # AIOHTTP Stack
-  aiohttp = fixDarwinSDK prev.aiohttp [] [];
-  multidict = fixDarwinSDK prev.multidict [] [];
-  yarl = fixDarwinSDK prev.yarl [] [];
-  frozenlist = fixDarwinSDK prev.frozenlist [] [];
-  aiosignal = fixDarwinSDK prev.aiosignal [] [];
-  brotli = fixDarwinSDK prev.brotli [] [];
-
-  # Web/Async Stack
-  tornado = fixDarwinSDK prev.tornado [] [];
-  pyzmq = fixDarwinSDK prev.pyzmq [ pkgs.zeromq ] [ pkgs.zeromq ];
-  wrapt = fixDarwinSDK prev.wrapt [] [];
-  msgpack = fixDarwinSDK prev.msgpack [] [];
-
-  # Pillow
-  pillow = fixDarwinSDK prev.pillow 
-    [ pkgs.pkg-config ] 
-    [ pkgs.libjpeg pkgs.zlib pkgs.libtiff pkgs.freetype pkgs.libwebp pkgs.openjpeg pkgs.libxcrypt ];
-
-  # System Interaction
-  psutil = fixDarwinSDK prev.psutil 
-    [ frameworks.IOKit frameworks.CoreFoundation ] 
-    [ frameworks.IOKit frameworks.CoreFoundation ];
-  pyperclip = fixDarwinSDK prev.pyperclip [] [];
-  sounddevice = fixDarwinSDK prev.sounddevice 
-    [ frameworks.CoreAudio frameworks.AudioToolbox ] 
-    [ pkgs.portaudio ];
-  
-  # Git Stack
-  gitpython = fixDarwinSDK prev.gitpython [] [];
-  gitdb = fixDarwinSDK prev.gitdb [] [];
-  smmap = fixDarwinSDK prev.smmap [] [];
-
-  # Data / Formats
-  numpy = fixDarwinSDK prev.numpy [ frameworks.Accelerate ] [];
-  pyyaml = fixDarwinSDK prev.pyyaml [] [];
-  markupsafe = fixDarwinSDK prev.markupsafe [] [];
-  pandas = fixDarwinSDK prev.pandas [] [];
-  pyarrow = fixDarwinSDK prev.pyarrow [ pkgs.cmake pkgs.ninja ] [ pkgs.arrow-cpp ];
-  protobuf = fixDarwinSDK prev.protobuf [ pkgs.cmake ] [ pkgs.protobuf ];
-  lxml = fixDarwinSDK prev.lxml [ pkgs.libxml2 pkgs.libxslt ] [ pkgs.libxml2 pkgs.libxslt ];
-
-  # Rust / Maturin Stack
-  pydantic-core = fixRustSDK prev.pydantic-core 
-    [ frameworks.Security frameworks.SystemConfiguration frameworks.CoreFoundation ];
-  tiktoken = fixRustSDK prev.tiktoken [ frameworks.Security ];
-  tokenizers = fixRustSDK prev.tokenizers [ frameworks.Security ];
-  watchfiles = let
-    base = fixRustSDK prev.watchfiles [ frameworks.CoreServices ];
-  in base.overridePythonAttrs (old: { preferWheel = true; });
-
-  # --- GRAFTED SCIPY ---
-  scipy = unstable.python311Packages.scipy;
-
-  # --- GRAFTED RPDS-PY ---
+  # Fix RPDS-PY
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
@@ -174,11 +88,16 @@ in
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
     dontCheckRuntimeDeps = true;
+    
     nativeBuildInputs = [
       unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin pkgs.pkg-config
-      pkgs.libiconv frameworks.Security frameworks.SystemConfiguration
+      pkgs.libiconv 
+      # FIX: Use standard Apple SDK from 24.11 (Stable)
+      pkgs.darwin.apple_sdk.frameworks.Security 
+      pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
     ];
     buildInputs = [ pkgs.libiconv ];
+    
     buildPhase = ''
       export CARGO_HOME=$PWD/.cargo
       maturin build --jobs=$NIX_BUILD_CORES --frozen --release --strip --manylinux off
