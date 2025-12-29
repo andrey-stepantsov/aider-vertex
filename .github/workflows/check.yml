@@ -5,6 +5,7 @@ on:
       - main
       - 'agent/**'
       - 'ci/**'
+      - 'feature/**'
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -36,49 +37,61 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Verify (Standard)
+      - name: Build & Verify App
         if: matrix.type == 'standard'
         run: |
           nix build . -L
           ./result/bin/aider-vertex --version
 
+      # --- NEW: Verify Docker Image Build (Linux Only) ---
+      # This confirms that 'nix build .#docker' produces a valid container.
+      - name: Verify Docker Image Build
+        if: matrix.name == 'Ubuntu (Nix)'
+        run: |
+          echo "Building Docker image..."
+          nix build .#docker
+          
+          echo "Verifying image structure..."
+          # Load the result (which is a tarball) into the runner's Docker daemon
+          docker load < result
+          
+          # Run the image to prove it works
+          docker run --rm aider-vertex:latest --version
+
       # --- CENTOS DOCKER STEP (Legacy Only) ---
       - name: Build & Run inside CentOS 7
         if: matrix.type == 'centos-docker'
         run: |
-          # 1. Mount pwd to /src
-          # 2. Fix EOL repos
-          # 3. Install Nix (Multi-user)
-          # 4. FIX: Trust /src for git
-          # 5. FIX: Start nix-daemon manually
+          # We use --privileged to ensure we can set up the build users/groups for Nix
           docker run --rm --privileged -v $(pwd):/src -w /src centos:7 bash -c "
             set -e
             
-            echo '>>> Fixing EOL Repositories...'
+            echo '>>> 1. Fixing EOL Repositories...'
             sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
             sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
             
-            echo '>>> Installing dependencies...'
+            echo '>>> 2. Installing System Dependencies...'
             yum -y install curl xz git sudo
             
-            echo '>>> Installing Nix...'
+            echo '>>> 3. Installing Nix...'
+            # We use --init none because Docker doesn't have systemd
             curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install linux --init none --no-confirm
             . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
             
-            echo '>>> Configuring Environment...'
-            # FIX 1: Trust the mounted directory (owned by host user)
+            echo '>>> 4. Configuring Environment...'
+            # FIX: Trust the mounted directory (owned by host user) to satisfy Git security
             git config --global --add safe.directory /src
             
-            # FIX 2: Start the daemon in the background (required for multi-user install)
+            # FIX: Manually start the daemon in the background since systemd isn't available
             /nix/var/nix/profiles/default/bin/nix-daemon > /var/log/nix-daemon.log 2>&1 &
             
-            # Wait a moment for the socket to appear
+            # Wait loop: ensure the socket is ready before we try to build
             for i in {1..10}; do
               if [ -S /nix/var/nix/daemon-socket/socket ]; then break; fi
-              echo 'Waiting for nix-daemon...'
+              echo 'Waiting for nix-daemon socket...'
               sleep 1
             done
 
-            echo '>>> Running Verification...'
+            echo '>>> 5. Running Verification...'
             nix run . -- --version
           "
