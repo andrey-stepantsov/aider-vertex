@@ -1,6 +1,7 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
+  # Wrap unstable binaries to look like Python packages
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in
@@ -62,7 +63,8 @@ in
   });
 
   # --- SDK DEPRECATION FIXES ---
-  
+  # Overwrite inputs to purge 'darwin.apple_sdk_11_0' from poetry2nix defaults
+
   cryptography = prev.cryptography.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.pkg-config pkgs.darwin.apple_sdk.frameworks.Security pkgs.libiconv ];
     buildInputs = [ pkgs.openssl pkgs.darwin.apple_sdk.frameworks.Security pkgs.libiconv ];
@@ -83,24 +85,36 @@ in
     buildInputs = [];
   });
 
-  # Fix: Sounddevice / PortAudio usually needs CoreAudio/AudioToolbox
+  # Fix: Psutil needs IOKit
+  psutil = prev.psutil.overridePythonAttrs (old: {
+    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.IOKit pkgs.darwin.apple_sdk.frameworks.CoreFoundation ];
+    buildInputs = [ pkgs.darwin.apple_sdk.frameworks.IOKit pkgs.darwin.apple_sdk.frameworks.CoreFoundation ];
+  });
+
+  # Fix: Watchfiles uses Rust/CoreServices
+  # Note: watchfiles uses maturin. We should provide the same env as rpds-py.
+  watchfiles = prev.watchfiles.overridePythonAttrs (old: {
+    nativeBuildInputs = [ 
+      unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
+      pkgs.darwin.apple_sdk.frameworks.CoreServices
+    ];
+    buildInputs = [ pkgs.darwin.apple_sdk.frameworks.CoreServices ];
+  });
+
   sounddevice = prev.sounddevice.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.CoreAudio pkgs.darwin.apple_sdk.frameworks.AudioToolbox ];
     buildInputs = [ pkgs.portaudio ];
   });
 
-  # Fix: Pyperclip might try to use Foundation/AppKit
   pyperclip = prev.pyperclip.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.Foundation pkgs.darwin.apple_sdk.frameworks.AppKit ];
   });
 
-  # Fix: NumPy often needs Accelerate
   numpy = prev.numpy.overridePythonAttrs (old: {
     nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     buildInputs = [];
   });
 
-  # Fix: Rust-based packages needing Security framework
   tiktoken = prev.tiktoken.overridePythonAttrs (old: {
     nativeBuildInputs = [ 
       pkgs.cargo pkgs.rustc pkgs.rustPlatform.cargoSetupHook pkgs.rustPlatform.maturinBuildHook 
@@ -115,7 +129,7 @@ in
     ];
   });
 
-  # Grafted Scipy
+  # Grafted Scipy (Unstable Binary)
   scipy = unstable.python311Packages.scipy;
 
   # GRAFTED RPDS-PY
@@ -140,6 +154,4 @@ in
       mv target/wheels/*.whl dist/
     '';
   };
-  
-  watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
 }
