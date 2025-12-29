@@ -75,7 +75,6 @@ in {
   });
 
   # GRAFTED RPDS-PY
-  # Clean build + Manual Build Phase + Disable Runtime Dep Check
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;

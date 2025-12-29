@@ -72,23 +72,25 @@ in
       final.meson 
       final.ninja
       unstable.pkg-config
-      pkgs.gfortran 
+      unstable.gfortran # Switched to UNSTABLE gfortran
     ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     
-    buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
+    buildInputs = (old.buildInputs or []) ++ [ unstable.gfortran.cc.lib ];
     
-    # Fix: Set MACOSX_DEPLOYMENT_TARGET and use NIX_LDFLAGS to ensure libgfortran is found
+    # Aggressive Linking to find Unstable libgfortran
     preConfigure = (old.preConfigure or "") + ''
       export MACOSX_DEPLOYMENT_TARGET=11.0
-      export FC=${pkgs.gfortran}/bin/gfortran
+      export FC=${unstable.gfortran}/bin/gfortran
       
-      export GFORTRAN_LIB="${pkgs.gfortran.cc.lib}/lib"
+      export GFORTRAN_LIB="${unstable.gfortran.cc.lib}/lib"
       
       # Runtime linkage helpers
       export DYLD_LIBRARY_PATH="$GFORTRAN_LIB:$DYLD_LIBRARY_PATH"
       export DYLD_FALLBACK_LIBRARY_PATH="$GFORTRAN_LIB:$DYLD_FALLBACK_LIBRARY_PATH"
       
-      # Build time linkage - Use NIX_LDFLAGS which survives pip scrubbing
+      # Build time linkage
+      # Add -L to FFLAGS so the compiler driver sees it too
+      export FFLAGS="-L$GFORTRAN_LIB $FFLAGS"
       export NIX_LDFLAGS="-rpath $GFORTRAN_LIB -L$GFORTRAN_LIB $NIX_LDFLAGS"
       export LDFLAGS="-Wl,-rpath,$GFORTRAN_LIB -L$GFORTRAN_LIB $LDFLAGS"
     '';
