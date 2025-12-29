@@ -14,7 +14,6 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
-      # This is the magic setting: If ANY job in the matrix fails, cancel the others immediately.
       fail-fast: true
       matrix:
         include:
@@ -25,7 +24,7 @@ jobs:
             os: macos-latest
             type: standard
           - name: "CentOS 7 (Legacy Verify)"
-            os: ubuntu-latest # We run on Ubuntu, but spawn a CentOS container
+            os: ubuntu-latest
             type: centos-docker
 
     steps:
@@ -47,8 +46,14 @@ jobs:
       - name: Build & Run inside CentOS 7
         if: matrix.type == 'centos-docker'
         run: |
-          docker run --rm -v $(pwd):/src -w /src centos:7 bash -c "
+          # 1. Mount pwd to /src
+          # 2. Fix EOL repos
+          # 3. Install Nix (Multi-user)
+          # 4. FIX: Trust /src for git
+          # 5. FIX: Start nix-daemon manually
+          docker run --rm --privileged -v $(pwd):/src -w /src centos:7 bash -c "
             set -e
+            
             echo '>>> Fixing EOL Repositories...'
             sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
             sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
@@ -60,6 +65,20 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install linux --init none --no-confirm
             . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
             
+            echo '>>> Configuring Environment...'
+            # FIX 1: Trust the mounted directory (owned by host user)
+            git config --global --add safe.directory /src
+            
+            # FIX 2: Start the daemon in the background (required for multi-user install)
+            /nix/var/nix/profiles/default/bin/nix-daemon > /var/log/nix-daemon.log 2>&1 &
+            
+            # Wait a moment for the socket to appear
+            for i in {1..10}; do
+              if [ -S /nix/var/nix/daemon-socket/socket ]; then break; fi
+              echo 'Waiting for nix-daemon...'
+              sleep 1
+            done
+
             echo '>>> Running Verification...'
             nix run . -- --version
           "
