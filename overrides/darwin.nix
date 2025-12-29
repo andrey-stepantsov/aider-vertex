@@ -29,8 +29,9 @@ in
   google-cloud-core = prev.google-cloud-core.overridePythonAttrs googleFix;
   google-api-core = prev.google-api-core.overridePythonAttrs googleFix;
   google-resumable-media = prev.google-resumable-media.overridePythonAttrs googleFix;
-  # google-crc32c REMOVED HERE - merged below
-  # google-cloud-resource-manager REMOVED HERE - merged below if needed, but it seems fine to keep separate if unique
+  google-crc32c = let
+    patched = prev.google-crc32c.overridePythonAttrs googleFix;
+  in fixDarwinSDK patched [] [];
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
@@ -93,13 +94,7 @@ in
   grpcio = fixDarwinSDK prev.grpcio 
     [ pkgs.cmake pkgs.ninja frameworks.CoreFoundation ] 
     [ pkgs.openssl pkgs.zlib frameworks.CoreFoundation ];
-  
   grpcio-status = fixDarwinSDK prev.grpcio-status [] [];
-  
-  # Merged Fix: Apply googleFix AND fixDarwinSDK for google-crc32c
-  google-crc32c = let
-    patched = prev.google-crc32c.overridePythonAttrs googleFix;
-  in fixDarwinSDK patched [] [];
 
   # AIOHTTP Stack
   aiohttp = fixDarwinSDK prev.aiohttp [] [];
@@ -107,6 +102,7 @@ in
   yarl = fixDarwinSDK prev.yarl [] [];
   frozenlist = fixDarwinSDK prev.frozenlist [] [];
   aiosignal = fixDarwinSDK prev.aiosignal [] [];
+  brotli = fixDarwinSDK prev.brotli [] []; # Used by aiohttp/urllib3
 
   # Pillow
   pillow = fixDarwinSDK prev.pillow 
@@ -117,9 +113,7 @@ in
   psutil = fixDarwinSDK prev.psutil 
     [ frameworks.IOKit frameworks.CoreFoundation ] 
     [ frameworks.IOKit frameworks.CoreFoundation ];
-  
   pyperclip = fixDarwinSDK prev.pyperclip [ frameworks.Foundation frameworks.AppKit ] [];
-  
   sounddevice = fixDarwinSDK prev.sounddevice 
     [ frameworks.CoreAudio frameworks.AudioToolbox ] 
     [ pkgs.portaudio ];
@@ -128,11 +122,17 @@ in
   numpy = fixDarwinSDK prev.numpy [ frameworks.Accelerate ] [];
   pyyaml = fixDarwinSDK prev.pyyaml [] [];
   markupsafe = fixDarwinSDK prev.markupsafe [] [];
+  pandas = fixDarwinSDK prev.pandas [] []; # Often pure, but poetry2nix might mess it up
+  pyarrow = fixDarwinSDK prev.pyarrow 
+    [ pkgs.cmake pkgs.ninja ] 
+    [ pkgs.arrow-cpp ]; # Heavy C++ dep
+  protobuf = fixDarwinSDK prev.protobuf 
+    [ pkgs.cmake ] 
+    [ pkgs.protobuf ]; # Uses system protobuf usually
   
   # Rust / Maturin Stack
   pydantic-core = fixRustSDK prev.pydantic-core 
     [ frameworks.Security frameworks.SystemConfiguration frameworks.CoreFoundation ];
-  
   tiktoken = fixRustSDK prev.tiktoken [ frameworks.Security ];
   tokenizers = fixRustSDK prev.tokenizers [ frameworks.Security ];
   watchfiles = fixRustSDK prev.watchfiles [ frameworks.CoreServices ];
@@ -150,13 +150,11 @@ in
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
     dontCheckRuntimeDeps = true;
-    
     nativeBuildInputs = [
       unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin pkgs.pkg-config
       pkgs.libiconv frameworks.Security frameworks.SystemConfiguration
     ];
     buildInputs = [ pkgs.libiconv ];
-    
     buildPhase = ''
       export CARGO_HOME=$PWD/.cargo
       maturin build --jobs=$NIX_BUILD_CORES --frozen --release --strip --manylinux off
