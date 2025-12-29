@@ -4,6 +4,10 @@ let
   # Wrap unstable binaries to look like Python packages
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
+
+  # Define a safe, explicit SDK to avoid "apple_sdk_11_0 has been removed" errors.
+  # We access frameworks from here instead of pkgs.darwin.apple_sdk
+  frameworks = pkgs.darwin.apple_sdk_12_3.frameworks;
 in
 {
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
@@ -63,11 +67,11 @@ in
   });
 
   # --- SDK DEPRECATION FIXES ---
-  # Overwrite inputs to purge 'darwin.apple_sdk_11_0' from poetry2nix defaults
+  # Explicitly overwrite inputs using 'frameworks' (SDK 12.3) to purge 11.0 references
 
   cryptography = prev.cryptography.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.pkg-config pkgs.darwin.apple_sdk.frameworks.Security pkgs.libiconv ];
-    buildInputs = [ pkgs.openssl pkgs.darwin.apple_sdk.frameworks.Security pkgs.libiconv ];
+    nativeBuildInputs = [ pkgs.pkg-config frameworks.Security pkgs.libiconv ];
+    buildInputs = [ pkgs.openssl frameworks.Security pkgs.libiconv ];
   });
 
   cffi = prev.cffi.overridePythonAttrs (old: {
@@ -77,55 +81,52 @@ in
 
   pyopenssl = prev.pyopenssl.overridePythonAttrs (old: {
     nativeBuildInputs = [];
-    buildInputs = [ pkgs.darwin.apple_sdk.frameworks.Security ];
+    buildInputs = [ frameworks.Security ];
   });
   
   keyring = prev.keyring.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.CoreFoundation ];
+    nativeBuildInputs = [ frameworks.Security frameworks.CoreFoundation ];
     buildInputs = [];
   });
 
-  # Fix: Psutil needs IOKit
   psutil = prev.psutil.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.IOKit pkgs.darwin.apple_sdk.frameworks.CoreFoundation ];
-    buildInputs = [ pkgs.darwin.apple_sdk.frameworks.IOKit pkgs.darwin.apple_sdk.frameworks.CoreFoundation ];
+    nativeBuildInputs = [ frameworks.IOKit frameworks.CoreFoundation ];
+    buildInputs = [ frameworks.IOKit frameworks.CoreFoundation ];
   });
 
-  # Fix: Watchfiles uses Rust/CoreServices
-  # Note: watchfiles uses maturin. We should provide the same env as rpds-py.
   watchfiles = prev.watchfiles.overridePythonAttrs (old: {
     nativeBuildInputs = [ 
       unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
-      pkgs.darwin.apple_sdk.frameworks.CoreServices
+      frameworks.CoreServices
     ];
-    buildInputs = [ pkgs.darwin.apple_sdk.frameworks.CoreServices ];
+    buildInputs = [ frameworks.CoreServices ];
   });
 
   sounddevice = prev.sounddevice.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.CoreAudio pkgs.darwin.apple_sdk.frameworks.AudioToolbox ];
+    nativeBuildInputs = [ frameworks.CoreAudio frameworks.AudioToolbox ];
     buildInputs = [ pkgs.portaudio ];
   });
 
   pyperclip = prev.pyperclip.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.Foundation pkgs.darwin.apple_sdk.frameworks.AppKit ];
+    nativeBuildInputs = [ frameworks.Foundation frameworks.AppKit ];
   });
 
   numpy = prev.numpy.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
+    nativeBuildInputs = [ frameworks.Accelerate ];
     buildInputs = [];
   });
 
   tiktoken = prev.tiktoken.overridePythonAttrs (old: {
     nativeBuildInputs = [ 
       pkgs.cargo pkgs.rustc pkgs.rustPlatform.cargoSetupHook pkgs.rustPlatform.maturinBuildHook 
-      pkgs.darwin.apple_sdk.frameworks.Security 
+      frameworks.Security 
     ];
   });
   
   tokenizers = prev.tokenizers.overridePythonAttrs (old: {
     nativeBuildInputs = [ 
       pkgs.cargo pkgs.rustc pkgs.rustPlatform.cargoSetupHook pkgs.rustPlatform.maturinBuildHook 
-      pkgs.darwin.apple_sdk.frameworks.Security 
+      frameworks.Security 
     ];
   });
 
@@ -144,7 +145,7 @@ in
     dontCheckRuntimeDeps = true;
     nativeBuildInputs = [
       unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin pkgs.pkg-config
-      pkgs.libiconv pkgs.darwin.apple_sdk.frameworks.Security pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+      pkgs.libiconv frameworks.Security frameworks.SystemConfiguration
     ];
     buildInputs = [ pkgs.libiconv ];
     buildPhase = ''
