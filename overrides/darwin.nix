@@ -15,7 +15,7 @@ in
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy tools
+  # Dummy tools - Essential for satisfying build-system checks (like pybind11 wanting 'ninja')
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -53,12 +53,12 @@ in
     propagatedBuildInputs = [ cleanNinjaBinary ];
   };
 
-  # Inject dummy ninja
+  # Inject dummy ninja into pybind11 (Fixed previous "Missing dependencies: ninja" error)
   pybind11 = prev.pybind11.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
   });
 
-  # Ensure meson-python finds dummy meson
+  # Ensure meson-python finds our dummy meson
   meson-python = prev.meson-python.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
@@ -72,24 +72,23 @@ in
       final.meson 
       final.ninja
       unstable.pkg-config
-      unstable.gfortran # Switched to UNSTABLE gfortran
+      pkgs.gfortran # Reverted to STABLE to match system Clang
     ] ++ [ pkgs.darwin.apple_sdk.frameworks.Accelerate ];
     
-    buildInputs = (old.buildInputs or []) ++ [ unstable.gfortran.cc.lib ];
+    buildInputs = (old.buildInputs or []) ++ [ pkgs.gfortran.cc.lib ];
     
-    # Aggressive Linking to find Unstable libgfortran
+    # Aggressive Linking to find Stable libgfortran
     preConfigure = (old.preConfigure or "") + ''
       export MACOSX_DEPLOYMENT_TARGET=11.0
-      export FC=${unstable.gfortran}/bin/gfortran
+      export FC=${pkgs.gfortran}/bin/gfortran
       
-      export GFORTRAN_LIB="${unstable.gfortran.cc.lib}/lib"
+      export GFORTRAN_LIB="${pkgs.gfortran.cc.lib}/lib"
       
       # Runtime linkage helpers
       export DYLD_LIBRARY_PATH="$GFORTRAN_LIB:$DYLD_LIBRARY_PATH"
       export DYLD_FALLBACK_LIBRARY_PATH="$GFORTRAN_LIB:$DYLD_FALLBACK_LIBRARY_PATH"
       
       # Build time linkage
-      # Add -L to FFLAGS so the compiler driver sees it too
       export FFLAGS="-L$GFORTRAN_LIB $FFLAGS"
       export NIX_LDFLAGS="-rpath $GFORTRAN_LIB -L$GFORTRAN_LIB $NIX_LDFLAGS"
       export LDFLAGS="-Wl,-rpath,$GFORTRAN_LIB -L$GFORTRAN_LIB $LDFLAGS"
@@ -100,6 +99,7 @@ in
   });
 
   # GRAFTED RPDS-PY for Darwin
+  # Clean build + Manual Build Phase + Disable Runtime Check
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
