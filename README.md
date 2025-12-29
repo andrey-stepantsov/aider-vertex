@@ -16,7 +16,7 @@ This package bridges the gap between Aider's rapid development cycle and the spe
 ### Run directly (No installation)
 If you have Nix installed with Flakes enabled, you can run Aider-Vertex instantly:
 
-    nix run github:andrey-stepantsov/aider-vertex -- --architect --model vertex_ai/gemini-2.0-flash-exp
+    nix run github:andrey-stepantsov/aider-vertex -- --architect --model vertex_ai/gemini-2.5-flash
 
 ### Install to Nix Profile
 To make the `aider-vertex` command available globally:
