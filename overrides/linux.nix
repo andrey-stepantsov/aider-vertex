@@ -75,7 +75,7 @@ in {
   });
 
   # GRAFTED RPDS-PY
-  # Fixed: Clean Build + Manual Build Phase + Disable Runtime Dep Check
+  # Clean build + Manual Build Phase + Disable Runtime Check
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
@@ -86,7 +86,6 @@ in {
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
 
-    # Bypass Metadata 2.4 check which crashes on Stable
     dontCheckRuntimeDeps = true;
 
     nativeBuildInputs = [
