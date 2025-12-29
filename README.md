@@ -61,10 +61,17 @@ If you are a Nix user, you can run the flake directly:
     export VERTEXAI_LOCATION="us-central1"
 
 ## Maintenance
-To update the underlying Aider engine:
-1. Update `pyproject.toml` version.
-2. Run `nix shell nixpkgs#poetry -c poetry update`.
-3. Tag a new release (e.g., `v1.0.x`) to trigger the Docker build pipeline.
+To update the underlying Aider engine or this wrapper:
+
+1. **Update Versions:**
+   - Update `version` in `pyproject.toml`.
+   - Update `WRAPPER_VERSION` in `aider_vertex/main.py` to match.
+2. **Refresh Lockfile:**
+   ```bash
+   nix shell nixpkgs#poetry -c poetry update
+   ```
+3. **Release:**
+   Tag a new release (e.g., `v1.0.x`) to automatically trigger the Docker build pipeline.
 
 ## License
 MIT License.
