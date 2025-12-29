@@ -1,14 +1,27 @@
 { pkgs, googleFix, unstable }:
 final: prev:
 let
-  # Wrap unstable binaries to look like Python packages
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
-
-  # Use the default SDK frameworks. 
-  # We avoid specific versions like 11_0 or 12_3 because they are being removed from Unstable.
-  # "pkgs.darwin.apple_sdk.frameworks" should point to the current valid SDK.
+  
   frameworks = pkgs.darwin.apple_sdk.frameworks;
+
+  # Helper to sanitise SDK inputs. 
+  # It effectively wipes out whatever poetry2nix added and sets safe defaults.
+  fixDarwinSDK = pkg: extraNative: extraBuild: pkg.overridePythonAttrs (old: {
+    nativeBuildInputs = [ pkgs.pkg-config pkgs.libiconv ] ++ extraNative;
+    buildInputs = [ pkgs.libiconv ] ++ extraBuild;
+  });
+
+  # Helper for Rust/Maturin packages
+  fixRustSDK = pkg: extraFrameworks: pkg.overridePythonAttrs (old: {
+    nativeBuildInputs = [ 
+      unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
+      pkgs.pkg-config pkgs.libiconv 
+    ] ++ extraFrameworks;
+    buildInputs = [ pkgs.libiconv ] ++ extraFrameworks;
+  });
+
 in
 {
   google-cloud-aiplatform = prev.google-cloud-aiplatform.overridePythonAttrs googleFix;
@@ -20,7 +33,6 @@ in
   google-cloud-resource-manager = prev.google-cloud-resource-manager.overridePythonAttrs googleFix;
   google-cloud-bigquery = prev.google-cloud-bigquery.overridePythonAttrs googleFix;
 
-  # Dummy tools
   meson = pkgs.python311Packages.buildPythonPackage {
     pname = "meson";
     version = unstable.meson.version;
@@ -67,72 +79,54 @@ in
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # --- SDK DEPRECATION FIXES ---
-  # Overwrite inputs to purge 'darwin.apple_sdk_11_0' from poetry2nix defaults
-
-  cryptography = prev.cryptography.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.pkg-config frameworks.Security pkgs.libiconv ];
-    buildInputs = [ pkgs.openssl frameworks.Security pkgs.libiconv ];
-  });
-
-  cffi = prev.cffi.overridePythonAttrs (old: {
-    nativeBuildInputs = [ pkgs.pkg-config pkgs.libffi ];
-    buildInputs = [ pkgs.libffi ];
-  });
-
-  pyopenssl = prev.pyopenssl.overridePythonAttrs (old: {
-    nativeBuildInputs = [];
-    buildInputs = [ frameworks.Security ];
-  });
+  # --- SDK FIXES ---
   
-  keyring = prev.keyring.overridePythonAttrs (old: {
-    nativeBuildInputs = [ frameworks.Security frameworks.CoreFoundation ];
-    buildInputs = [];
-  });
+  cryptography = fixDarwinSDK prev.cryptography 
+    [ frameworks.Security ] 
+    [ pkgs.openssl frameworks.Security ];
 
-  psutil = prev.psutil.overridePythonAttrs (old: {
-    nativeBuildInputs = [ frameworks.IOKit frameworks.CoreFoundation ];
-    buildInputs = [ frameworks.IOKit frameworks.CoreFoundation ];
-  });
+  cffi = fixDarwinSDK prev.cffi 
+    [ pkgs.libffi ] 
+    [ pkgs.libffi ];
 
-  watchfiles = prev.watchfiles.overridePythonAttrs (old: {
-    nativeBuildInputs = [ 
-      unstable.cargo unstable.rustc pkgs.rustPlatform.cargoSetupHook unstable.maturin 
-      frameworks.CoreServices
-    ];
-    buildInputs = [ frameworks.CoreServices ];
-    preferWheel = true; # Merged from duplicate definition
-  });
-
-  sounddevice = prev.sounddevice.overridePythonAttrs (old: {
-    nativeBuildInputs = [ frameworks.CoreAudio frameworks.AudioToolbox ];
-    buildInputs = [ pkgs.portaudio ];
-  });
-
-  pyperclip = prev.pyperclip.overridePythonAttrs (old: {
-    nativeBuildInputs = [ frameworks.Foundation frameworks.AppKit ];
-  });
-
-  numpy = prev.numpy.overridePythonAttrs (old: {
-    nativeBuildInputs = [ frameworks.Accelerate ];
-    buildInputs = [];
-  });
-
-  tiktoken = prev.tiktoken.overridePythonAttrs (old: {
-    nativeBuildInputs = [ 
-      pkgs.cargo pkgs.rustc pkgs.rustPlatform.cargoSetupHook pkgs.rustPlatform.maturinBuildHook 
-      frameworks.Security 
-    ];
-  });
+  pyopenssl = fixDarwinSDK prev.pyopenssl [] [ frameworks.Security ];
   
-  tokenizers = prev.tokenizers.overridePythonAttrs (old: {
-    nativeBuildInputs = [ 
-      pkgs.cargo pkgs.rustc pkgs.rustPlatform.cargoSetupHook pkgs.rustPlatform.maturinBuildHook 
-      frameworks.Security 
-    ];
-  });
+  keyring = fixDarwinSDK prev.keyring 
+    [ frameworks.Security frameworks.CoreFoundation ] [];
 
-  # Grafted Scipy (Unstable Binary)
+  psutil = fixDarwinSDK prev.psutil 
+    [ frameworks.IOKit frameworks.CoreFoundation ] 
+    [ frameworks.IOKit frameworks.CoreFoundation ];
+
+  sounddevice = fixDarwinSDK prev.sounddevice 
+    [ frameworks.CoreAudio frameworks.AudioToolbox ] 
+    [ pkgs.portaudio ];
+
+  pyperclip = fixDarwinSDK prev.pyperclip 
+    [ frameworks.Foundation frameworks.AppKit ] [];
+
+  numpy = fixDarwinSDK prev.numpy 
+    [ frameworks.Accelerate ] [];
+
+  # Fix Rust/Maturin packages
+  # Pydantic-core is a prime suspect for using Security framework defaults
+  pydantic-core = fixRustSDK prev.pydantic-core 
+    [ frameworks.Security frameworks.SystemConfiguration frameworks.CoreFoundation ];
+
+  tiktoken = fixRustSDK prev.tiktoken 
+    [ frameworks.Security ];
+  
+  tokenizers = fixRustSDK prev.tokenizers 
+    [ frameworks.Security ];
+
+  watchfiles = fixRustSDK prev.watchfiles 
+    [ frameworks.CoreServices ];
+
+  # Fix C-extension packages
+  pyyaml = fixDarwinSDK prev.pyyaml [] [];
+  markupsafe = fixDarwinSDK prev.markupsafe [] [];
+
+  # Grafted Scipy
   scipy = unstable.python311Packages.scipy;
 
   # GRAFTED RPDS-PY
