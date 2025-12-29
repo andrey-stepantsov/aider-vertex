@@ -75,10 +75,8 @@ in {
   });
 
   # GRAFTED RPDS-PY
-  # Strategy: Clean Build + Hybrid Toolchain
-  # - Stable Environment (pkgs.python311Packages)
-  # - Unstable Source (src, cargoDeps, patches)
-  # - Hybrid Tools: Unstable Compiler + Stable Hooks + Unstable Maturin Binary
+  # Clean build + Manual Maturin Execution
+  # This bypasses the shell script errors in maturinBuildHook entirely.
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
@@ -92,11 +90,17 @@ in {
     nativeBuildInputs = [
       unstable.cargo 
       unstable.rustc 
-      # Use Stable hooks to avoid shell script errors (concatTo not found)
-      pkgs.rustPlatform.cargoSetupHook 
-      # Use Stable hook logic but inject Unstable binary to support new pyproject.toml
-      (pkgs.rustPlatform.maturinBuildHook.override { maturin = unstable.maturin; }) 
+      pkgs.rustPlatform.cargoSetupHook # Keep this to handle vendoring
+      unstable.maturin                 # Use binary directly
       pkgs.pkg-config
     ];
+
+    # Manually run maturin to avoid hook script incompatibilities
+    buildPhase = ''
+      export CARGO_HOME=$PWD/.cargo
+      maturin build --jobs=$NIX_BUILD_CORES --frozen --release --strip --manylinux off
+      mkdir -p dist
+      mv target/wheels/*.whl dist/
+    '';
   };
 }

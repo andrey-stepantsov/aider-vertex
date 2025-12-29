@@ -40,7 +40,6 @@ final: prev:
   });
 
   # GRAFTED RPDS-PY for Darwin
-  # Strategy: Clean Build + Hybrid Toolchain
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
@@ -54,15 +53,21 @@ final: prev:
     nativeBuildInputs = [
       unstable.cargo 
       unstable.rustc 
-      # Stable hooks + Unstable binary override
-      pkgs.rustPlatform.cargoSetupHook 
-      (pkgs.rustPlatform.maturinBuildHook.override { maturin = unstable.maturin; })
+      pkgs.rustPlatform.cargoSetupHook
+      unstable.maturin
       pkgs.pkg-config
       pkgs.libiconv 
       pkgs.darwin.apple_sdk.frameworks.Security 
       pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
     ];
     buildInputs = [ pkgs.libiconv ];
+
+    buildPhase = ''
+      export CARGO_HOME=$PWD/.cargo
+      maturin build --jobs=$NIX_BUILD_CORES --frozen --release --strip --manylinux off
+      mkdir -p dist
+      mv target/wheels/*.whl dist/
+    '';
   };
   
   watchfiles = prev.watchfiles.overridePythonAttrs (old: { preferWheel = true; });
