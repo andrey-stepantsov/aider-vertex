@@ -3,17 +3,17 @@ on:
   push:
     branches:
       - main
-      - 'agent/**'  # <--- Add this so the agent can trigger builds
+      - 'agent/**'
+      - 'ci/**'
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # <--- Allows manual triggering if needed
+  workflow_dispatch:
 
 jobs:
   check-build:
     strategy:
       matrix:
-        # We verify both, but the agent will focus on the Linux logs
-        os: [ubuntu-latest, macos-latest] 
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -24,3 +24,26 @@ jobs:
         run: nix build . -L
       - name: Verify Logic (Version Check)
         run: ./result/bin/aider-vertex --version
+
+  verify-centos:
+    name: "Runtime Check (CentOS 7)"
+    runs-on: ubuntu-latest
+    container: centos:7
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install System Dependencies
+        # CentOS 7 repos are archived; we might need to fix mirror lists or just install basics.
+        # 'xz' is required for Nix installation. 'git' is required for flakes.
+        run: yum -y install curl xz git sudo
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v9
+        with:
+          init: none 
+          extra-conf: |
+            experimental-features = nix-command flakes
+
+      - name: Build & Run on CentOS
+        # "nix run" builds the package and immediately executes the binary
+        run: nix run . -- --version
