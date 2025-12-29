@@ -50,6 +50,9 @@ final: prev:
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
 
+    # Bypass Metadata 2.4 check
+    dontCheckRuntimeDeps = true;
+
     nativeBuildInputs = [
       unstable.cargo 
       unstable.rustc 

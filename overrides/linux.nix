@@ -75,8 +75,7 @@ in {
   });
 
   # GRAFTED RPDS-PY
-  # Clean build + Manual Maturin Execution
-  # This bypasses the shell script errors in maturinBuildHook entirely.
+  # Fixed: Clean Build + Manual Build Phase + Disable Runtime Dep Check
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
@@ -87,15 +86,17 @@ in {
     cargoPatches = unstable.python311Packages.rpds-py.cargoPatches or [];
     postPatch = unstable.python311Packages.rpds-py.postPatch or "";
 
+    # Bypass Metadata 2.4 check which crashes on Stable
+    dontCheckRuntimeDeps = true;
+
     nativeBuildInputs = [
       unstable.cargo 
       unstable.rustc 
-      pkgs.rustPlatform.cargoSetupHook # Keep this to handle vendoring
-      unstable.maturin                 # Use binary directly
+      pkgs.rustPlatform.cargoSetupHook
+      unstable.maturin
       pkgs.pkg-config
     ];
 
-    # Manually run maturin to avoid hook script incompatibilities
     buildPhase = ''
       export CARGO_HOME=$PWD/.cargo
       maturin build --jobs=$NIX_BUILD_CORES --frozen --release --strip --manylinux off
