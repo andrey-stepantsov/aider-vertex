@@ -2,8 +2,6 @@
 final: prev:
 let
   # Wrap unstable binaries to look like Python packages
-  # Note: Since 'pkgs' is now Unstable on Mac, pkgs.meson is essentially unstable.meson.
-  # But we keep this explicit wrap to be safe.
   cleanMesonBinary = unstable.meson.overrideAttrs (old: { setupHook = null; });
   cleanNinjaBinary = unstable.ninja.overrideAttrs (old: { setupHook = null; });
 in
@@ -55,22 +53,38 @@ in
     propagatedBuildInputs = [ cleanNinjaBinary ];
   };
 
-  # Inject dummy ninja
   pybind11 = prev.pybind11.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.ninja ];
   });
 
-  # Ensure meson-python finds dummy meson
   meson-python = prev.meson-python.overridePythonAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ final.meson ];
     propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ final.meson ];
   });
 
-  # GRAFTED SCIPY (Unstable Binary)
+  # Fix: Override cryptography to use modern Security framework (fixing deprecated SDK crash)
+  cryptography = prev.cryptography.overridePythonAttrs (old: {
+    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+      pkgs.darwin.apple_sdk.frameworks.Security
+      pkgs.libiconv
+    ];
+  });
+
+  # Fix: Override cffi to use modern libffi and frameworks (fixing deprecated SDK crash)
+  cffi = prev.cffi.overridePythonAttrs (old: {
+    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+      pkgs.pkg-config
+      pkgs.libffi
+    ];
+    buildInputs = (old.buildInputs or []) ++ [
+      pkgs.libffi
+    ];
+  });
+
+  # Grafted Scipy
   scipy = unstable.python311Packages.scipy;
 
   # GRAFTED RPDS-PY for Darwin
-  # 'pkgs' is now Unstable, so this builds with Python 3.11.14 automatically.
   rpds-py = pkgs.python311Packages.buildPythonPackage {
     pname = "rpds-py";
     version = unstable.python311Packages.rpds-py.version;
