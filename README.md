@@ -50,6 +50,31 @@ If you are a Nix user, you can run the flake directly:
 - **Vertex Patched:** Includes critical fixes for `google-cloud-aiplatform` and `rpds-py` crashes.
 - **Git Aware:** Includes a full internal Git installation for repo management.
 
+## 🛠 Legacy C/C++ Toolkit (New in v1.1.0)
+Aider-Vertex now includes a "Modernization Workbench" pre-installed in the container. These tools allow the AI to index, search, and refactor massive C/C++ codebases without external dependencies.
+
+| Tool | Usage | Why it matters |
+| :--- | :--- | :--- |
+| **Bear** | `bear -- make` | Generates `compile_commands.json` for older Make-based projects. |
+| **Clang-Tidy** | `clang-tidy ...` | Static analysis and automatic refactoring. |
+| **Ast-Grep** | `sg run ...` | Structural search and replace (better than regex for code). |
+| **Universal Ctags** | (Auto-used by Aider) | distinct symbol definitions for the LLM context. |
+| **Weave-View** | `weave-view ...` | Creates virtual "views" of monorepos to focus the LLM. |
+
+### Using `weave-view`
+For massive monorepos where you only want the AI to see specific subsystems:
+
+```bash
+# Create a virtual view containing only "driver" and "firmware" folders
+weave-view my-feature driver/net firmware/bootloader
+
+# Switch to the view
+cd view-my-feature
+
+# Run Aider (it sees only these files + headers)
+aider-vertex
+```
+
 ## Configuration
 
 ### 1. Authenticate

@@ -119,6 +119,7 @@
               pkgs.universal-ctags
               pkgs.bear
               pkgs.jq
+              pkgs.clang-tools  # <--- Added clang-tidy
               ctx-tool
               weave-view
             ];
@@ -147,7 +148,7 @@
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
           packages = [ 
-            self.packages.${system}.default      # Aider-Vertex
+            self.packages.${system}.default       # Aider-Vertex
             
             # --- [NEW] The Legacy Toolkit ---
             nixpkgs.legacyPackages.${system}.ripgrep
@@ -164,7 +165,7 @@
           
           shellHook = ''
             echo "🚀 Aider-Vertex Environment Ready"
-            echo "   Tools: rg, sg, ctags, bear, jq, ctx"
+            echo "   Tools: rg, sg, ctags, bear, jq, ctx, clang-tidy"
             echo "   Helper: weave-view <name> <dirs...>"
           '';
         };
