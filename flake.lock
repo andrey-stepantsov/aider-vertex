@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "ctx-tool-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1766638008,
+        "narHash": "sha256-OClH4V30l37q6oJZNn+6yF/3n+OSxjJZcim4qdL64Ro=",
+        "owner": "andrey-stepantsov",
+        "repo": "ctx-tool",
+        "rev": "a2c1044d37229ff3682454bc0502cd68680ea29c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "andrey-stepantsov",
+        "repo": "ctx-tool",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -97,6 +113,7 @@
     },
     "root": {
       "inputs": {
+        "ctx-tool-src": "ctx-tool-src",
         "nixpkgs": "nixpkgs",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "poetry2nix": "poetry2nix"
