@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aider-vertex"
-version = "1.1.0"
+version = "1.1.1"
 description = "Nix wrapper for Aider (v0.86.1) with Vertex AI support"
 authors = ["Andrey Stepantsov <andrey.stepantosv@gmail.com>"]
 readme = "README.md"

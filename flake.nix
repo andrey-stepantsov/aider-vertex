@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.0)";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.1)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -9,7 +9,7 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
     
-    # [NEW] Source for your custom tool
+    # Custom tool source
     ctx-tool-src = {
       url = "github:andrey-stepantsov/ctx-tool";
       flake = false;
@@ -27,7 +27,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           p2n = poetry2nix.lib.mkPoetry2Nix { inherit pkgs; };
           
-          # --- [NEW] 1. Custom Tool Build ---
+          # --- 1. Custom Tool Build ---
           ctx-tool = pkgs.python3Packages.buildPythonApplication {
             pname = "ctx-tool";
             version = "0.0.1";
@@ -38,7 +38,7 @@
             doCheck = false;
           };
 
-          # --- [NEW] 2. The Weaver Script (Production) ---
+          # --- 2. The Weaver Script (v1.1.1: Multi-DB Support) ---
           weave-view = pkgs.writeShellScriptBin "weave-view" ''
             set -e
             if [ "$#" -lt 2 ]; then
@@ -49,7 +49,10 @@
             echo "🧵 Weaving virtual view: $VIEW_NAME"
             mkdir -p "$VIEW_NAME/_sys"
 
+            # 1. Link Files & Build Filter
             JQ_ARGS=""; MODE=0
+            declare -a SRC_PATHS
+            
             for arg in "$@"; do
               if [ "$arg" == "--sys" ]; then MODE=1; continue; fi
               if [[ "$arg" = /* ]]; then ABS="$arg"; else ABS="$(pwd)/$arg"; fi
@@ -57,6 +60,8 @@
               if [ $MODE -eq 0 ]; then
                 REL=$(dirname "$arg"); mkdir -p "$VIEW_NAME/$REL"
                 ln -sf "$ABS" "$VIEW_NAME/$arg"
+                SRC_PATHS+=("$ABS")
+                
                 if [ -z "$JQ_ARGS" ]; then JQ_ARGS=".file | startswith(\"$ABS\")";
                 else JQ_ARGS="$JQ_ARGS or (.file | startswith(\"$ABS\"))"; fi
               else
@@ -64,10 +69,29 @@
               fi
             done
             
-            if [ -f "compile_commands.json" ] && [ ! -z "$JQ_ARGS" ]; then
-               echo "   [i] Filtering compilation database..."
-               ${pkgs.jq}/bin/jq "[.[] | select($JQ_ARGS)]" compile_commands.json > "$VIEW_NAME/compile_commands.json"
+            # 2. Aggregated Compilation Database
+            # Search for compile_commands.json in root AND all source dirs
+            echo "   [i] Searching for compilation databases..."
+            DB_LIST=$(mktemp)
+            
+            if [ -f "compile_commands.json" ]; then echo "$(pwd)/compile_commands.json" >> $DB_LIST; fi
+            
+            for path in "''${SRC_PATHS[@]}"; do
+               find "$path" -maxdepth 3 -name "compile_commands.json" >> $DB_LIST 2>/dev/null || true
+            done
+            
+            UNIQUE_DBS=$(cat $DB_LIST | sort | uniq)
+            
+            if [ ! -z "$UNIQUE_DBS" ] && [ ! -z "$JQ_ARGS" ]; then
+               COUNT=$(echo "$UNIQUE_DBS" | wc -l)
+               echo "   [i] Merging $COUNT compilation databases..."
+               echo "$UNIQUE_DBS" | xargs ${pkgs.jq}/bin/jq -s "add | [.[] | select($JQ_ARGS)]" > "$VIEW_NAME/compile_commands.json"
+               echo "   [✓] Master compile_commands.json created."
+            else
+               echo "   [!] No compilation databases found (or ignored)."
             fi
+            rm -f $DB_LIST
+            
             echo "_sys/" > "$VIEW_NAME/.aiderignore"
             if [ -f .aiderignore ]; then cat .aiderignore >> "$VIEW_NAME/.aiderignore"; fi
             echo "✅ View Ready: cd $VIEW_NAME"
@@ -102,7 +126,6 @@
 
         in {
           default = app;
-          # Expose tools so devShell can see them
           inherit ctx-tool weave-view; 
 
           docker = pkgs.dockerTools.buildLayeredImage {
@@ -112,14 +135,12 @@
             contents = [ 
               app 
               pkgs.cacert pkgs.coreutils pkgs.bash pkgs.git pkgs.openssh
-              
-              # --- [NEW] Add Tools to Docker ---
               pkgs.ripgrep
               pkgs.ast-grep
               pkgs.universal-ctags
               pkgs.bear
               pkgs.jq
-              pkgs.clang-tools  # <--- Added clang-tidy
+              pkgs.clang-tools
               ctx-tool
               weave-view
             ];
@@ -148,17 +169,13 @@
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
           packages = [ 
-            self.packages.${system}.default       # Aider-Vertex
-            
-            # --- [NEW] The Legacy Toolkit ---
+            self.packages.${system}.default
             nixpkgs.legacyPackages.${system}.ripgrep
             nixpkgs.legacyPackages.${system}.ast-grep
             nixpkgs.legacyPackages.${system}.universal-ctags
             nixpkgs.legacyPackages.${system}.bear
             nixpkgs.legacyPackages.${system}.jq
             nixpkgs.legacyPackages.${system}.clang-tools
-            
-            # --- [NEW] Custom Tools ---
             self.packages.${system}.ctx-tool
             self.packages.${system}.weave-view
           ];
