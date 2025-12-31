@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.3)";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.4)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -124,7 +124,6 @@
             name = "aider-vertex";
             tag = "latest";
             
-            # [FIX 1] /tmp
             extraCommands = ''
               mkdir -p tmp
               chmod 1777 tmp
@@ -135,25 +134,20 @@
               pkgs.cacert pkgs.coreutils 
               pkgs.git pkgs.openssh
               
-              # [FIX 2] Standard Linux Utils (The Missing Ones)
-              pkgs.gnused     # sed
-              pkgs.gnugrep    # grep
-              pkgs.gawk       # awk
-              pkgs.which      # which
-              pkgs.file       # file command
-              pkgs.gzip       # gzip/gunzip
-              pkgs.gnutar     # tar
+              # [Standard GNU Utils]
+              pkgs.gnused pkgs.gnugrep pkgs.gawk 
+              pkgs.which pkgs.file pkgs.gzip pkgs.gnutar
               
-              # [FIX 3] Interactive Shell & Editors
-              pkgs.bashInteractive
-              pkgs.findutils
-              pkgs.procps
-              pkgs.less
-              pkgs.ncurses
-              pkgs.vim
-              pkgs.neovim
+              # [Interactive Shell]
+              pkgs.bashInteractive pkgs.findutils pkgs.procps
+              pkgs.less pkgs.ncurses pkgs.vim pkgs.neovim
+
+              # [Toolchain Headers]
+              pkgs.gcc
+              pkgs.glibc.dev 
+              pkgs.clang
               
-              # [TOOLKIT]
+              # [Toolkit]
               pkgs.ripgrep
               pkgs.ast-grep
               pkgs.universal-ctags
@@ -180,6 +174,8 @@
                 "LC_ALL=C.UTF-8"
                 "LANG=C.UTF-8"
                 "TERM=xterm-256color"
+                "C_INCLUDE_PATH=${pkgs.glibc.dev}/include"
+                "CPLUS_INCLUDE_PATH=${pkgs.gcc.cc}/include/c++/${pkgs.gcc.version}"
               ];
             };
           };
@@ -194,6 +190,8 @@
             nixpkgs.legacyPackages.${system}.gnused
             nixpkgs.legacyPackages.${system}.gnugrep
             nixpkgs.legacyPackages.${system}.gawk
+            nixpkgs.legacyPackages.${system}.gcc
+            nixpkgs.legacyPackages.${system}.clang
             nixpkgs.legacyPackages.${system}.ripgrep
             nixpkgs.legacyPackages.${system}.ast-grep
             nixpkgs.legacyPackages.${system}.universal-ctags
