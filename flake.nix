@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.4)";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.5)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -89,6 +89,43 @@
             echo "✅ View Ready: cd $VIEW_NAME"
           '';
 
+          # --- 3. The CC Toolkit (Context Managers) ---
+          
+          cc-targets = pkgs.writeShellScriptBin "cc-targets" ''
+            if [ -z "$1" ]; then echo "Usage: cc-targets <filename>"; exit 1; fi
+            ${pkgs.jq}/bin/jq -r --arg f "$1" '.[] | select(.file | contains($f)) | 
+              "--------------------------------------------------",
+              "Target: \(.output | split("/")[-2])",
+              "  Path: \(.output)",
+              "  Arch: \(.arguments | map(select(startswith("-DARCH") or startswith("-DSW_CHIP"))) | join(" "))",
+              "Defines: \(.arguments | map(select(startswith("-D"))) | length) flags"' compile_commands.json
+          '';
+
+          cc-flags = pkgs.writeShellScriptBin "cc-flags" ''
+            if [ -z "$1" ]; then 
+              echo "Usage: cc-flags <filename> [regex]"
+              exit 1
+            fi
+            FLAG_REGEX="''${2:-.*}"
+            ${pkgs.jq}/bin/jq -r --arg f "$1" --arg re "$FLAG_REGEX" '
+              .[] | select(.file | contains($f)) |
+              "==================================================",
+              "TARGET: \(.output | split("/")[-2])",
+              "--------------------------------------------------",
+              (.arguments[] | select(test($re)))
+            ' compile_commands.json
+          '';
+
+          cc-pick = pkgs.writeShellScriptBin "cc-pick" ''
+            if [ -z "$2" ]; then
+              echo "Usage: cc-pick <filename> <target_keyword>"
+              exit 1
+            fi
+            ${pkgs.jq}/bin/jq --arg f "$1" --arg t "$2" '
+              .[] | select(.file | contains($f)) | select(.output | contains($t))
+            ' compile_commands.json
+          '';
+
           # --- App Configuration ---
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
@@ -118,7 +155,8 @@
 
         in {
           default = app;
-          inherit ctx-tool weave-view; 
+          # Export the CC toolkit
+          inherit ctx-tool weave-view cc-targets cc-flags cc-pick; 
 
           docker = pkgs.dockerTools.buildLayeredImage {
             name = "aider-vertex";
@@ -134,20 +172,20 @@
               pkgs.cacert pkgs.coreutils 
               pkgs.git pkgs.openssh
               
-              # [Standard GNU Utils]
+              # Standard Utils
               pkgs.gnused pkgs.gnugrep pkgs.gawk 
               pkgs.which pkgs.file pkgs.gzip pkgs.gnutar
               
-              # [Interactive Shell]
+              # Interactive
               pkgs.bashInteractive pkgs.findutils pkgs.procps
               pkgs.less pkgs.ncurses pkgs.vim pkgs.neovim
 
-              # [Toolchain Headers]
+              # Toolchain
               pkgs.gcc
               pkgs.glibc.dev 
               pkgs.clang
               
-              # [Toolkit]
+              # Toolkit
               pkgs.ripgrep
               pkgs.ast-grep
               pkgs.universal-ctags
@@ -156,12 +194,23 @@
               pkgs.clang-tools
               ctx-tool
               weave-view
+              cc-targets cc-flags cc-pick # <--- The Suite
             ];
 
             fakeRootCommands = ''
               mkdir -p /usr/bin
               ln -s ${pkgs.coreutils}/bin/env /usr/bin/env
               ln -sf ${pkgs.bashInteractive}/bin/bash /bin/bash
+              
+              # --- Mission Pack Support ---
+              # Create the mount point and add it to PATH
+              mkdir -p /mission/bin
+              chmod 755 /mission/bin
+              
+              mkdir -p /root
+              echo 'export PATH=$PATH:/mission/bin' >> /root/.bashrc
+              mkdir -p /etc
+              echo 'export PATH=$PATH:/mission/bin' >> /etc/bashrc
             '';
 
             config = {
@@ -185,28 +234,38 @@
         default = nixpkgs.legacyPackages.${system}.mkShell {
           packages = [ 
             self.packages.${system}.default
+            # Utilities
             nixpkgs.legacyPackages.${system}.bashInteractive
             nixpkgs.legacyPackages.${system}.findutils
+            nixpkgs.legacyPackages.${system}.jq
             nixpkgs.legacyPackages.${system}.gnused
             nixpkgs.legacyPackages.${system}.gnugrep
             nixpkgs.legacyPackages.${system}.gawk
-            nixpkgs.legacyPackages.${system}.gcc
-            nixpkgs.legacyPackages.${system}.clang
             nixpkgs.legacyPackages.${system}.ripgrep
             nixpkgs.legacyPackages.${system}.ast-grep
             nixpkgs.legacyPackages.${system}.universal-ctags
             nixpkgs.legacyPackages.${system}.bear
-            nixpkgs.legacyPackages.${system}.jq
-            nixpkgs.legacyPackages.${system}.clang-tools
             nixpkgs.legacyPackages.${system}.neovim
+            
+            # Toolchain
+            nixpkgs.legacyPackages.${system}.gcc
+            nixpkgs.legacyPackages.${system}.clang
+            nixpkgs.legacyPackages.${system}.clang-tools
+
+            # Custom Tools
             self.packages.${system}.ctx-tool
+            self.packages.${system}.cc-targets
+            self.packages.${system}.cc-flags
+            self.packages.${system}.cc-pick
             self.packages.${system}.weave-view
           ];
           
           shellHook = ''
-            echo "🚀 Aider-Vertex Environment Ready"
-            echo "   Tools: rg, sg, ctags, bear, jq, ctx, clang-tidy, nvim"
-            echo "   Helper: weave-view <name> <dirs...>"
+            echo "🚀 Aider-Vertex v1.1.5 Environment Ready"
+            echo "   Context Tools:"
+            echo "     cc-targets <file>          - List build targets"
+            echo "     cc-flags   <file> [regex]  - Inspect flags"
+            echo "     cc-pick    <file> <target> - Extract JSON for AI"
           '';
         };
       });
