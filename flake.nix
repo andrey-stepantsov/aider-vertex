@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.2)";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.3)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -135,14 +135,23 @@
               pkgs.cacert pkgs.coreutils 
               pkgs.git pkgs.openssh
               
-              # [FIX 2] Interactive Tools
+              # [FIX 2] Standard Linux Utils (The Missing Ones)
+              pkgs.gnused     # sed
+              pkgs.gnugrep    # grep
+              pkgs.gawk       # awk
+              pkgs.which      # which
+              pkgs.file       # file command
+              pkgs.gzip       # gzip/gunzip
+              pkgs.gnutar     # tar
+              
+              # [FIX 3] Interactive Shell & Editors
               pkgs.bashInteractive
               pkgs.findutils
               pkgs.procps
               pkgs.less
               pkgs.ncurses
-              pkgs.vim        # Standard Vim
-              pkgs.neovim     # <--- Added Vanilla Neovim
+              pkgs.vim
+              pkgs.neovim
               
               # [TOOLKIT]
               pkgs.ripgrep
@@ -182,6 +191,9 @@
             self.packages.${system}.default
             nixpkgs.legacyPackages.${system}.bashInteractive
             nixpkgs.legacyPackages.${system}.findutils
+            nixpkgs.legacyPackages.${system}.gnused
+            nixpkgs.legacyPackages.${system}.gnugrep
+            nixpkgs.legacyPackages.${system}.gawk
             nixpkgs.legacyPackages.${system}.ripgrep
             nixpkgs.legacyPackages.${system}.ast-grep
             nixpkgs.legacyPackages.${system}.universal-ctags
