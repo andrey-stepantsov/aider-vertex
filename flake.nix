@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.1)";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.2)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -9,7 +9,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
     
-    # Custom tool source
     ctx-tool-src = {
       url = "github:andrey-stepantsov/ctx-tool";
       flake = false;
@@ -38,7 +37,7 @@
             doCheck = false;
           };
 
-          # --- 2. The Weaver Script (v1.1.1: Multi-DB Support) ---
+          # --- 2. The Weaver Script ---
           weave-view = pkgs.writeShellScriptBin "weave-view" ''
             set -e
             if [ "$#" -lt 2 ]; then
@@ -49,7 +48,6 @@
             echo "🧵 Weaving virtual view: $VIEW_NAME"
             mkdir -p "$VIEW_NAME/_sys"
 
-            # 1. Link Files & Build Filter
             JQ_ARGS=""; MODE=0
             declare -a SRC_PATHS
             
@@ -61,7 +59,6 @@
                 REL=$(dirname "$arg"); mkdir -p "$VIEW_NAME/$REL"
                 ln -sf "$ABS" "$VIEW_NAME/$arg"
                 SRC_PATHS+=("$ABS")
-                
                 if [ -z "$JQ_ARGS" ]; then JQ_ARGS=".file | startswith(\"$ABS\")";
                 else JQ_ARGS="$JQ_ARGS or (.file | startswith(\"$ABS\"))"; fi
               else
@@ -69,19 +66,14 @@
               fi
             done
             
-            # 2. Aggregated Compilation Database
-            # Search for compile_commands.json in root AND all source dirs
             echo "   [i] Searching for compilation databases..."
             DB_LIST=$(mktemp)
-            
             if [ -f "compile_commands.json" ]; then echo "$(pwd)/compile_commands.json" >> $DB_LIST; fi
-            
             for path in "''${SRC_PATHS[@]}"; do
                find "$path" -maxdepth 3 -name "compile_commands.json" >> $DB_LIST 2>/dev/null || true
             done
             
             UNIQUE_DBS=$(cat $DB_LIST | sort | uniq)
-            
             if [ ! -z "$UNIQUE_DBS" ] && [ ! -z "$JQ_ARGS" ]; then
                COUNT=$(echo "$UNIQUE_DBS" | wc -l)
                echo "   [i] Merging $COUNT compilation databases..."
@@ -97,7 +89,7 @@
             echo "✅ View Ready: cd $VIEW_NAME"
           '';
 
-          # --- Existing App Configuration ---
+          # --- App Configuration ---
           googleFix = old: {
             postPatch = (old.postPatch or "") + ''
               if [ -f pyproject.toml ]; then
@@ -132,9 +124,27 @@
             name = "aider-vertex";
             tag = "latest";
             
+            # [FIX 1] /tmp
+            extraCommands = ''
+              mkdir -p tmp
+              chmod 1777 tmp
+            '';
+
             contents = [ 
               app 
-              pkgs.cacert pkgs.coreutils pkgs.bash pkgs.git pkgs.openssh
+              pkgs.cacert pkgs.coreutils 
+              pkgs.git pkgs.openssh
+              
+              # [FIX 2] Interactive Tools
+              pkgs.bashInteractive
+              pkgs.findutils
+              pkgs.procps
+              pkgs.less
+              pkgs.ncurses
+              pkgs.vim        # Standard Vim
+              pkgs.neovim     # <--- Added Vanilla Neovim
+              
+              # [TOOLKIT]
               pkgs.ripgrep
               pkgs.ast-grep
               pkgs.universal-ctags
@@ -146,10 +156,9 @@
             ];
 
             fakeRootCommands = ''
-              mkdir -p /tmp
-              chmod 1777 /tmp
               mkdir -p /usr/bin
               ln -s ${pkgs.coreutils}/bin/env /usr/bin/env
+              ln -sf ${pkgs.bashInteractive}/bin/bash /bin/bash
             '';
 
             config = {
@@ -161,6 +170,7 @@
                 "PYTHONUTF8=1"
                 "LC_ALL=C.UTF-8"
                 "LANG=C.UTF-8"
+                "TERM=xterm-256color"
               ];
             };
           };
@@ -170,19 +180,22 @@
         default = nixpkgs.legacyPackages.${system}.mkShell {
           packages = [ 
             self.packages.${system}.default
+            nixpkgs.legacyPackages.${system}.bashInteractive
+            nixpkgs.legacyPackages.${system}.findutils
             nixpkgs.legacyPackages.${system}.ripgrep
             nixpkgs.legacyPackages.${system}.ast-grep
             nixpkgs.legacyPackages.${system}.universal-ctags
             nixpkgs.legacyPackages.${system}.bear
             nixpkgs.legacyPackages.${system}.jq
             nixpkgs.legacyPackages.${system}.clang-tools
+            nixpkgs.legacyPackages.${system}.neovim
             self.packages.${system}.ctx-tool
             self.packages.${system}.weave-view
           ];
           
           shellHook = ''
             echo "🚀 Aider-Vertex Environment Ready"
-            echo "   Tools: rg, sg, ctags, bear, jq, ctx, clang-tidy"
+            echo "   Tools: rg, sg, ctags, bear, jq, ctx, clang-tidy, nvim"
             echo "   Helper: weave-view <name> <dirs...>"
           '';
         };
