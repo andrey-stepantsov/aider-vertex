@@ -12,6 +12,18 @@
     - **Fix:** Update `flake.nix` to check if the argument already starts with `view-` before prepending it.
 
 ## 🛠️ Deployment & Experience
+- [ ] **Implement `./dev` Orchestrator & Target Management**
+    - **Goal:** Create a single entry point for managing views and launching the environment.
+    - **Implementation:**
+        1. **Presets:** Create a `targets/` directory to store file lists (e.g., `app1.txt`, `network.txt`).
+        2. **Orchestration:** Create a `./dev` script that:
+           - Accepts a target name (e.g., `./dev app1`).
+           - Reads the pattern from `targets/app1.txt`.
+           - Runs `./weave-view` with those patterns.
+           - Checks/Starts `dd-daemon` if needed.
+           - Launches `aider-vertex` into the generated view.
+    - **Benefit:** Zero-friction context switching (e.g., just type `./dev network`).
+
 - [ ] **Implement "The Doctor" (Pre-Flight Checks)**
     - **Goal:** Prevent startup failures by verifying the environment before launching the container.
     - **Implementation:** Add a `check_health` function to `launch-aider.sh` that validates:
@@ -28,14 +40,6 @@
         3. Hardcode absolute paths (e.g., `test-cmd: /data/.ddd/wait`) in this generated file.
         4. Mount it into the container as `/data/.aider.conf.yml`.
     - **Benefit:** Ensures `test-cmd` always works regardless of the directory Aider starts in.
-
-- [ ] **Unified Entry Script (`./dev`)**
-    - **Goal:** Reduce startup friction.
-    - **Implementation:** Create a master script that:
-        1. Checks for/starts the `dd-daemon` in the background.
-        2. Sets up a `trap` to kill the daemon on exit.
-        3. Launches the `aider-vertex` container.
-    - **Benefit:** Single command startup for the entire Triple-Head environment.
 
 ## 🧠 Feature Enhancements
 - [ ] **Auto-Init Ephemeral Git Session**
