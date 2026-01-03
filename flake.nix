@@ -223,6 +223,7 @@
             echo "     cc-targets <file>          - List build targets"
             echo "     cc-flags   <file> [regex]  - Inspect flags"
             echo "     cc-pick    <file> <target> - Extract JSON for AI"
+            exec bash
           '';
         };
       });

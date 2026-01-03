@@ -20,10 +20,10 @@
       "  poetry install",
       "fi",
       
-      "# --- Activation Logic (Safe) ---",
-      "# We do NOT exec bash here, because it breaks tools that use PTYs (like Aider).",
+      "# --- Activation Logic ---",
       "export PATH=$PWD/bin:$PATH",
-      "source .venv/bin/activate"
+      "source .venv/bin/activate",
+      "exec bash"
     ],
     "scripts": {
       "dev": "./dev"
