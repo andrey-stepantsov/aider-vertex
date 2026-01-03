@@ -27,7 +27,7 @@
     - **Issue:** Host-generated `compile_commands.json` contains host paths (`/Users/...`) that are invalid inside the Docker container (`/data/...`).
     - **Fix:** Add a normalization step to `weave-view` that detects the host prefix and rewrites it to `/data` before filtering.
 
-- [ ] **Analyze Clang-Tidy Include Path Strategy**
+- [x] **Analyze Clang-Tidy Include Path Strategy**
     - **Issue:** Views exclude headers needed for local linting (`#include "missing.h"`), causing `clang-tidy` false positives inside Aider.
     - **Mitigation:** Update `targets/` definitions to include header directories, or script a "Header Weaving" step.
 
