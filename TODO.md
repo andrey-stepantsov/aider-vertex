@@ -10,3 +10,6 @@
 ## 🚀 Enhancements
 - [ ] **Support `.aider.conf.yml` Readability**
     - Ensure `weave-view` correctly handles or copies the config file if needed in the view (currently handled by exclusions, but verified context pathing is important).
+    - [ ] **Fix `weave-view` Redundant Naming**
+        - **Issue:** The script unconditionally prepends `view-` to the user-supplied name. If a user runs `weave-view view-app ...`, it creates `view-view-app`, which is confusing and redundant.
+        - **Fix:** Update `flake.nix` to check if the argument already starts with `view-` before prepending it.
