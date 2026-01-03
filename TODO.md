@@ -24,13 +24,13 @@
 
 ## 🐛 Bugs & Edge Cases
 - [x] **Fix `weave-view` Path Mismatch in Docker**
-    - **Issue:** Host-generated `compile_commands.json` contains host paths (`/Users/...`) that are invalid inside the Docker container (`/data/...`).
-    - **Fix:** Add a normalization step to `weave-view` that detects the host prefix and rewrites it to `/data` before filtering.
+    - **Status:** **Done.**
+    - **Details:** `weave-view` now auto-detects path mismatches between the host JSON and the container environment, using `sed` to rewrite paths to `/data` before filtering.
 
 - [x] **Analyze Clang-Tidy Include Path Strategy**
-    - **Issue:** Views exclude headers needed for local linting (`#include "missing.h"`), causing `clang-tidy` false positives inside Aider.
-    - **Mitigation:** Update `targets/` definitions to include header directories, or script a "Header Weaving" step.
+    - **Status:** **Done.**
+    - **Details:** Implemented `weave-headers` (Python) to parse `compile_commands.json` and symlink repo-internal headers into `_sys/includes`. External headers are reported to stdout. Verified with `tests/unit/test_header_weaving.sh`.
 
-- [ ] **Fix `weave-view` Redundant Naming**
-    - **Issue:** Script double-prefixes names (e.g., `view-view-app`).
-    - **Fix:** Check if prefix exists before adding it in `flake.nix` (or in the script itself).
+- [x] **Fix `weave-view` Redundant Naming**
+    - **Status:** **Done.**
+    - **Details:** Updated `./dev` script to check if the target name already starts with `view-` before prepending it. Verified with `tests/unit/test_naming_normalization.sh`.
