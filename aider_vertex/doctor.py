@@ -1,16 +1,24 @@
 import os
 import sys
+import shutil
+import time
+from pathlib import Path
 
 def check_health():
     """
     Performs pre-flight checks for the Aider-Vertex environment.
+    Verifies Credentials, Toolchain, and the DDD Interface.
     Returns True if healthy, False otherwise.
     """
     print("👨‍⚕️  Running Pre-Flight Checks (The Doctor)...")
     issues = []
+    warnings = []
 
-    # 1. Credentials
+    # --- 1. Credentials & Environment ---
     creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    project = os.environ.get("VERTEXAI_PROJECT")
+    location = os.environ.get("VERTEXAI_LOCATION")
+
     if not creds:
         issues.append("❌ GOOGLE_APPLICATION_CREDENTIALS not set.")
     elif not os.path.exists(creds):
@@ -18,37 +26,71 @@ def check_health():
     else:
         print("   [✓] Auth: Credentials found.")
 
-    # 2. Vertex Config
-    project = os.environ.get("VERTEXAI_PROJECT")
-    location = os.environ.get("VERTEXAI_LOCATION")
-    if not project:
-        issues.append("❌ VERTEXAI_PROJECT not set.")
-    if not location:
-        issues.append("❌ VERTEXAI_LOCATION not set.")
-    
-    if project and location:
+    if not project or not location:
+        issues.append("❌ VERTEXAI_PROJECT and VERTEXAI_LOCATION must be set.")
+    else:
         print(f"   [✓] Vertex: {project} ({location})")
 
-    # 3. DDD Interface (The Triple Head)
-    # Check if we are in a valid root by looking for .ddd
-    # Note: If running inside a view, we check the parent or assume the mount is correct.
-    cwd = os.getcwd()
-    ddd_dir = os.path.join(cwd, ".ddd")
+    # --- 2. Toolchain Verification ---
+    required_tools = ["git", "jq", "weave-view"]
+    missing_tools = [t for t in required_tools if not shutil.which(t)]
     
-    # Simple check: assumes we are running from root or .ddd is available
-    if os.path.isdir(ddd_dir):
-        print(f"   [✓] DDD: Found .ddd interface in {cwd}")
+    if missing_tools:
+        issues.append(f"❌ Missing critical tools in PATH: {', '.join(missing_tools)}")
     else:
-        # If we are in a view-*, the .ddd might be one level up or not symlinked yet
-        # This is just a warning, as parasitic mode might not be required for all runs.
-        print(f"   [!] Info: No .ddd directory found in {cwd}.")
-        print("       (If using Parasitic Mode, ensure you are in the project root)")
+        print("   [✓] Toolchain: git, jq, weave-view found.")
 
-    # Report
+    # --- 3. DDD Interface (The Triple Head) ---
+    # Logic: Walk up from CWD to find .ddd
+    cwd = Path.cwd()
+    ddd_dir = None
+    
+    # Search up to 3 levels up to find the interface
+    for parent in [cwd] + list(cwd.parents)[:3]:
+        candidate = parent / ".ddd"
+        if candidate.is_dir():
+            ddd_dir = candidate
+            break
+
+    if ddd_dir:
+        # Check 3A: Writability (Critical for signaling)
+        if not os.access(ddd_dir, os.W_OK):
+            issues.append(f"❌ DDD Interface found at {ddd_dir} but is NOT WRITABLE.")
+        else:
+            print(f"   [✓] DDD: Interface linked at {ddd_dir}")
+            
+        # Check 3B: Stale Lock Warning
+        lock_file = ddd_dir / "run.lock"
+        if lock_file.exists():
+            # If lock is older than 5 minutes, warn
+            if time.time() - lock_file.stat().st_mtime > 300:
+                warnings.append(f"⚠️  Stale lock file detected ({lock_file}). The daemon might be stuck.")
+            else:
+                print("   [i] Daemon is currently BUSY (run.lock exists).")
+    else:
+        # It is valid to run without DDD (e.g. standard Aider use), but worthy of a warning
+        # if the user expects the "Triple-Head" integration.
+        warnings.append("⚠️  No .ddd directory found. 'Parasitic Mode' (Build/Verify) will not work.")
+
+    # --- 4. Git Bridge Integrity (View Mode) ---
+    # If we are inside a 'view-*' directory, we expect GIT_DIR to be set by ./dev
+    if cwd.name.startswith("view-") or cwd.parent.name.startswith("view-"):
+        if not os.environ.get("GIT_DIR"):
+             warnings.append("⚠️  Running inside a 'view' but GIT_DIR is not set. Git operations might fail.")
+        else:
+            print("   [✓] Git Bridge: Active.")
+
+    # --- Reporting ---
+    if warnings:
+        print("\n🤔 Warnings:")
+        for w in warnings:
+            print(w)
+
     if issues:
-        print("\n🚨 Doctor found critical issues:")
+        print("\n🚨 Doctor found CRITICAL issues:")
         for issue in issues:
             print(issue)
+        print("")
         return False
     
     print("   [✓] System Healthy.\n")
