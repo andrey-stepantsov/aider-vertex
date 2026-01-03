@@ -23,7 +23,7 @@
     - **Details:** `main.py` generates a temporary `.aider.conf.yml` at runtime, resolving the absolute path to `test-cmd` (`.ddd/wait`) relative to the current view.
 
 ## 🐛 Bugs & Edge Cases
-- [ ] **Fix `weave-view` Path Mismatch in Docker**
+- [x] **Fix `weave-view` Path Mismatch in Docker**
     - **Issue:** Host-generated `compile_commands.json` contains host paths (`/Users/...`) that are invalid inside the Docker container (`/data/...`).
     - **Fix:** Add a normalization step to `weave-view` that detects the host prefix and rewrites it to `/data` before filtering.
 
