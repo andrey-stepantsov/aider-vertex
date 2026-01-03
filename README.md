@@ -53,7 +53,8 @@ docker load < aider-vertex-docker.tar.gz
 If you do not want to build the image yourself, you can pull the pre-built release:
 
 ```bash
-docker pull ghcr.io/<YOUR_USERNAME>/aider-vertex:latest
+docker pull ghcr.io/andrey-stepantsov/aider-vertex:latest
+
 ```
 
 *(Note: Replace `<YOUR_USERNAME>` with your GitHub username or organization).*
@@ -122,3 +123,4 @@ The AI *thinks* it is editing a small, self-contained project. In reality, it is
 
 ## 📜 License
 Apache 2.0
+
