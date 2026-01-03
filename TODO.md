@@ -23,14 +23,14 @@
     - **Details:** `main.py` generates a temporary `.aider.conf.yml` at runtime, resolving the absolute path to `test-cmd` (`.ddd/wait`) relative to the current view.
 
 ## 🐛 Bugs & Edge Cases
+- [ ] **Fix `weave-view` Path Mismatch in Docker**
+    - **Issue:** Host-generated `compile_commands.json` contains host paths (`/Users/...`) that are invalid inside the Docker container (`/data/...`).
+    - **Fix:** Add a normalization step to `weave-view` that detects the host prefix and rewrites it to `/data` before filtering.
+
 - [ ] **Analyze Clang-Tidy Include Path Strategy**
     - **Issue:** Views exclude headers needed for local linting (`#include "missing.h"`), causing `clang-tidy` false positives inside Aider.
     - **Mitigation:** Update `targets/` definitions to include header directories, or script a "Header Weaving" step.
 
-- [ ] **Fix `weave-view` Path Mismatch in Docker**
-    - **Issue:** Host-generated `compile_commands.json` contains host paths (`/Users/...`) that are invalid inside the Docker container (`/data/...`).
-    - **Fix:** Add a `sed` step to `weave-view` to rewrite paths when running in Docker mode.
-
 - [ ] **Fix `weave-view` Redundant Naming**
     - **Issue:** Script double-prefixes names (e.g., `view-view-app`).
-    - **Fix:** Check if prefix exists before adding it in `flake.nix`.
+    - **Fix:** Check if prefix exists before adding it in `flake.nix` (or in the script itself).
