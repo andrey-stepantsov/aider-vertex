@@ -14,8 +14,6 @@ mkdir -p "$VIEW_NAME/_sys"
 
 JQ_ARGS=""; MODE=0
 declare -a SRC_PATHS
-
-# Save PWD to resolve absolute paths correctly
 ROOT_DIR="$(pwd)"
 
 for arg in "$@"; do
@@ -33,6 +31,7 @@ for arg in "$@"; do
   fi
 done
 
+# --- JSON Generation ---
 echo "   [i] Searching for compilation databases..."
 DB_LIST=$(mktemp)
 if [ -f "compile_commands.json" ]; then echo "$ROOT_DIR/compile_commands.json" >> $DB_LIST; fi
@@ -41,49 +40,26 @@ for path in "${SRC_PATHS[@]}"; do
 done
 
 UNIQUE_DBS=$(cat $DB_LIST | sort | uniq)
+TARGET_JSON="$VIEW_NAME/compile_commands.json"
 
 if [ ! -z "$UNIQUE_DBS" ] && [ ! -z "$JQ_ARGS" ]; then
     if command -v jq &> /dev/null; then
-        # --- PATH FIX: Normalize Host Paths to Container Paths ---
-        # 1. Read the raw DB
         RAW_JSON=$(cat $UNIQUE_DBS | jq -s "add")
-        
-        # 2. Detect Path Mismatch (Heuristic)
-        # Grab the first file path from the JSON
         SAMPLE_PATH=$(echo "$RAW_JSON" | jq -r '.[0].file // empty')
         
+        # Rewrite Host Paths if needed
         if [ ! -z "$SAMPLE_PATH" ] && [[ "$SAMPLE_PATH" != "$ROOT_DIR"* ]]; then
             echo "   [!] Detected Path Mismatch (Host vs Container)"
-            echo "       JSON Path: $SAMPLE_PATH"
-            echo "       Current Dir: $ROOT_DIR"
-            
-            # 3. Calculate the Prefix to Strip
-            # Assumption: The relative path structure matches.
-            # We find where the current directory's name appears in the sample path.
-            # E.g. ROOT_DIR=/data, SAMPLE=/Users/bob/repo/src/main.c
-            # We want to map /Users/bob/repo -> /data
-            
-            # Try to guess the host root by stripping the local relative path of the first source arg
             FIRST_SRC="${SRC_PATHS[0]}" 
-            # Remove ROOT_DIR from FIRST_SRC to get relative path (e.g., /src/main.c)
             REL_PATH="${FIRST_SRC#$ROOT_DIR}"
-            
-            # Now remove REL_PATH from the end of SAMPLE_PATH
             HOST_ROOT="${SAMPLE_PATH%$REL_PATH}"
-            
             if [ ! -z "$HOST_ROOT" ] && [ "$HOST_ROOT" != "$SAMPLE_PATH" ]; then
-                 echo "       Detected Host Root: $HOST_ROOT"
-                 echo "       Rewriting to: $ROOT_DIR"
                  RAW_JSON=$(echo "$RAW_JSON" | sed "s|$HOST_ROOT|$ROOT_DIR|g")
-            else
-                 echo "       [!] Could not auto-detect host root. Compilation DB might be empty."
             fi
         fi
 
-        # 4. Filter
-        echo "$RAW_JSON" | jq "[.[] | select($JQ_ARGS)]" > "$VIEW_NAME/compile_commands.json"
-        
-        COUNT=$(jq length "$VIEW_NAME/compile_commands.json")
+        echo "$RAW_JSON" | jq "[.[] | select($JQ_ARGS)]" > "$TARGET_JSON"
+        COUNT=$(jq length "$TARGET_JSON")
         echo "   [✓] Master compile_commands.json created ($COUNT entries)."
     else
         echo "   [!] 'jq' not found. Skipping compile_commands.json generation."
@@ -92,6 +68,36 @@ else
     echo "   [!] No compilation databases found (or ignored)."
 fi
 rm -f $DB_LIST
+
+# --- PHASE 2: Header Weaving ---
+if [ -f "$TARGET_JSON" ]; then
+    echo "   [i] Scanning for missing headers..."
+    mkdir -p "$VIEW_NAME/_sys/includes"
+    
+    WEAVER_BIN="weave-headers"
+    if ! command -v weave-headers &> /dev/null; then
+        if [ -f "bin/weave-headers" ]; then
+             WEAVER_BIN="bin/weave-headers"
+        else
+             echo "   [!] Warning: weave-headers not found."
+             WEAVER_BIN="false"
+        fi
+    fi
+
+    if [ "$WEAVER_BIN" != "false" ]; then
+        # FIX: Variable renamed from PATH to HEADER_PATH to avoid overwriting system PATH
+        "$WEAVER_BIN" "$ROOT_DIR" "$VIEW_NAME" "$TARGET_JSON" | while IFS='|' read -r TYPE HEADER_PATH SLUG; do
+            if [ "$TYPE" == "INTERNAL" ]; then
+                LINK_PATH="$VIEW_NAME/_sys/includes/$SLUG"
+                if [ ! -e "$LINK_PATH" ]; then
+                    ln -sf "$HEADER_PATH" "$LINK_PATH"
+                fi
+            elif [ "$TYPE" == "EXTERNAL" ]; then
+                echo "      [!] External Include: $HEADER_PATH"
+            fi
+        done
+    fi
+fi
 
 echo "_sys/" > "$VIEW_NAME/.aiderignore"
 if [ -f .aiderignore ]; then cat .aiderignore >> "$VIEW_NAME/.aiderignore"; fi

@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+import sys
+import json
+import re
+import os
+from pathlib import Path
+
+def debug(msg):
+    sys.stderr.write(f"[weave-headers] {msg}\n")
+
+def main():
+    if len(sys.argv) < 4:
+        print("Usage: weave-headers <repo_root> <view_root> <json_file>")
+        sys.exit(1)
+
+    # 1. Resolve Roots using pathlib (Handle symlinks like /var -> /private/var)
+    repo_root = Path(sys.argv[1]).resolve()
+    view_root = Path(sys.argv[2]).resolve()
+    json_path = Path(sys.argv[3]).resolve()
+
+    debug(f"Repo Root: {repo_root}")
+    debug(f"JSON Path: {json_path}")
+
+    if not json_path.exists():
+        debug("JSON file not found.")
+        sys.exit(0)
+
+    try:
+        with open(json_path) as f:
+            db = json.load(f)
+    except json.JSONDecodeError:
+        debug("Failed to decode JSON.")
+        sys.exit(0)
+
+    internal_paths = set()
+    external_paths = set()
+    
+    # Regex for -I flags
+    regex_inc = re.compile(r'-I\s*(\S+)')
+
+    for entry in db:
+        # Resolve the directory where the command runs
+        raw_dir = entry.get('directory', str(repo_root))
+        cwd = Path(raw_dir).resolve()
+        
+        cmd = entry.get('command', '')
+        if not cmd and 'arguments' in entry:
+            cmd = ' '.join(entry['arguments'])
+        
+        matches = regex_inc.findall(cmd)
+        for inc in matches:
+            # Resolve the include path relative to CWD
+            p = Path(inc)
+            if not p.is_absolute():
+                abs_path = (cwd / p).resolve()
+            else:
+                abs_path = p.resolve()
+            
+            # Filter System Paths
+            str_path = str(abs_path)
+            if str_path.startswith('/usr') or str_path.startswith('/nix'):
+                continue
+            
+            # Ancestry Check using pathlib
+            # "is_relative_to" was added in Python 3.9
+            try:
+                if abs_path.is_relative_to(repo_root):
+                    internal_paths.add(abs_path)
+                else:
+                    external_paths.add(abs_path)
+            except AttributeError:
+                # Fallback for older python if needed (though we use 3.11)
+                try:
+                    abs_path.relative_to(repo_root)
+                    internal_paths.add(abs_path)
+                except ValueError:
+                    external_paths.add(abs_path)
+
+    # Output instructions for Bash
+    for p in sorted(internal_paths):
+        # Calculate slug: libs/hidden -> libs_hidden
+        rel = p.relative_to(repo_root)
+        slug = str(rel).replace(os.sep, '_')
+        print(f"INTERNAL|{p}|{slug}")
+
+    for p in sorted(external_paths):
+        print(f"EXTERNAL|{p}")
+
+if __name__ == "__main__":
+    main()

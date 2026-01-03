@@ -37,14 +37,16 @@
             doCheck = false;
           };
 
-          # --- 2. The Weaver Script (Single Source of Truth) ---
-          # We now read the script from bin/weave-view instead of defining it inline.
-          # We use substituteAll to hardcode the path to 'jq' so it works even if
-          # jq isn't in the global PATH of the container.
+          # --- 2. The Weaver Scripts ---
+          
+          # weave-view: The Bash Orchestrator
           weave-view = pkgs.writeShellScriptBin "weave-view" ''
             export PATH=${pkgs.jq}/bin:$PATH
             ${builtins.readFile ./bin/weave-view}
           '';
+
+          # weave-headers: The Python Path Resolver
+          weave-headers = pkgs.writeScriptBin "weave-headers" (builtins.readFile ./bin/weave-headers);
 
           # --- 3. The CC Toolkit (Context Managers) ---
           
@@ -113,7 +115,7 @@
         in {
           default = app;
           # Export the CC toolkit
-          inherit ctx-tool weave-view cc-targets cc-flags cc-pick; 
+          inherit ctx-tool weave-view weave-headers cc-targets cc-flags cc-pick; 
 
           docker = pkgs.dockerTools.buildLayeredImage {
             name = "aider-vertex";
@@ -150,7 +152,8 @@
               pkgs.jq
               pkgs.clang-tools
               ctx-tool
-              weave-view # Now uses bin/weave-view via the wrapper above
+              weave-view # Bash wrapper
+              weave-headers # Python logic
               cc-targets cc-flags cc-pick
             ];
 
@@ -215,6 +218,7 @@
             self.packages.${system}.cc-flags
             self.packages.${system}.cc-pick
             self.packages.${system}.weave-view
+            self.packages.${system}.weave-headers
           ];
           
           shellHook = ''
