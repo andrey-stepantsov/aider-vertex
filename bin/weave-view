@@ -9,6 +9,9 @@ fi
 INPUT_NAME="$1"; shift
 if [[ "$INPUT_NAME" == view-* ]]; then VIEW_NAME="$INPUT_NAME"; else VIEW_NAME="view-$INPUT_NAME"; fi
 
+# Resolve Script Directory (to find siblings like weave-headers)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 echo "🧵 Weaving virtual view: $VIEW_NAME"
 mkdir -p "$VIEW_NAME/_sys"
 
@@ -74,19 +77,25 @@ if [ -f "$TARGET_JSON" ]; then
     echo "   [i] Scanning for missing headers..."
     mkdir -p "$VIEW_NAME/_sys/includes"
     
-    WEAVER_BIN="weave-headers"
-    if ! command -v weave-headers &> /dev/null; then
-        if [ -f "bin/weave-headers" ]; then
-             WEAVER_BIN="bin/weave-headers"
-        else
-             echo "   [!] Warning: weave-headers not found."
-             WEAVER_BIN="false"
-        fi
+    declare -a WEAVER_CMD
+    
+    # Priority 1: Local Sibling Script (Best for Dev/Docker Mounts)
+    # We prefer this because it allows us to force 'python3' execution
+    if [ -f "$SCRIPT_DIR/weave-headers" ]; then
+        echo "   [DEBUG] Using local sibling: $SCRIPT_DIR/weave-headers"
+        WEAVER_CMD=("python3" "$SCRIPT_DIR/weave-headers")
+        
+    # Priority 2: System Installed Tool (Best for Production/Nix)
+    elif command -v weave-headers &> /dev/null; then
+        echo "   [DEBUG] Using system tool: weave-headers"
+        WEAVER_CMD=("weave-headers")
+    else
+        echo "   [!] Warning: weave-headers not found."
+        WEAVER_CMD=("false")
     fi
 
-    if [ "$WEAVER_BIN" != "false" ]; then
-        # FIX: Variable renamed from PATH to HEADER_PATH to avoid overwriting system PATH
-        "$WEAVER_BIN" "$ROOT_DIR" "$VIEW_NAME" "$TARGET_JSON" | while IFS='|' read -r TYPE HEADER_PATH SLUG; do
+    if [ "${WEAVER_CMD[0]}" != "false" ]; then
+        "${WEAVER_CMD[@]}" "$ROOT_DIR" "$VIEW_NAME" "$TARGET_JSON" | while IFS='|' read -r TYPE HEADER_PATH SLUG; do
             if [ "$TYPE" == "INTERNAL" ]; then
                 LINK_PATH="$VIEW_NAME/_sys/includes/$SLUG"
                 if [ ! -e "$LINK_PATH" ]; then

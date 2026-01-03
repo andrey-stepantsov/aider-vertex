@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.1.5)";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.2.0)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -114,7 +114,6 @@
 
         in {
           default = app;
-          # Export the CC toolkit
           inherit ctx-tool weave-view weave-headers cc-targets cc-flags cc-pick; 
 
           docker = pkgs.dockerTools.buildLayeredImage {
@@ -127,7 +126,8 @@
             '';
 
             contents = [ 
-              app 
+              app
+              pkgs.python3 # <--- ADDED: Explicit Python Interpreter 
               pkgs.cacert pkgs.coreutils 
               pkgs.git pkgs.openssh
               
@@ -152,8 +152,8 @@
               pkgs.jq
               pkgs.clang-tools
               ctx-tool
-              weave-view # Bash wrapper
-              weave-headers # Python logic
+              weave-view
+              weave-headers
               cc-targets cc-flags cc-pick
             ];
 
@@ -163,7 +163,6 @@
               ln -sf ${pkgs.bashInteractive}/bin/bash /bin/bash
               
               # --- Mission Pack Support ---
-              # Create the mount point and add it to PATH
               mkdir -p /mission/bin
               chmod 755 /mission/bin
               

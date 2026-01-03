@@ -26,6 +26,8 @@ fi
 mkdir -p "$VIEW_NAME"
 echo "[MOCK-WEAVE] Weaving $VIEW_NAME"
 MOCK
+# chmod +x might not work on mounts, but we are in /tmp (native linux), so it should. 
+# However, explicit invocation is safer.
 chmod +x "$MOCK_REPO/bin/weave-view"
 
 # 2. Mock 'aider-vertex'
@@ -59,8 +61,8 @@ cd "$MOCK_REPO"
 
 # --- CASE 1: Standard Name (foo) ---
 echo "   [1/2] Testing target 'foo' -> expect 'view-foo'"
-# Use timeout to prevent hanging if real aider starts
-if OUTPUT_1=$(timeout 2s ./dev foo 2>&1); then
+# FIX: Use 'bash ./dev' explicitly to avoid Shebang/Permission issues in Docker
+if OUTPUT_1=$(timeout 2s bash ./dev foo 2>&1); then
     if echo "$OUTPUT_1" | grep -q "Launched in .*view-foo$"; then
         echo "   ✅ Success: 'foo' resolved to 'view-foo'"
     else
@@ -76,7 +78,7 @@ fi
 
 # --- CASE 2: Prefixed Name (view-bar) ---
 echo "   [2/2] Testing target 'view-bar' -> expect 'view-bar' (NOT view-view-bar)"
-if OUTPUT_2=$(timeout 2s ./dev view-bar 2>&1); then
+if OUTPUT_2=$(timeout 2s bash ./dev view-bar 2>&1); then
     if echo "$OUTPUT_2" | grep -q "Launched in .*view-bar$"; then
         echo "   ✅ Success: 'view-bar' resolved to 'view-bar' (Idempotent)"
     else

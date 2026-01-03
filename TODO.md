@@ -1,36 +1,21 @@
-# Project TODOs
+# Project Roadmap
 
-## 🧠 Feature Enhancements
-- [x] **Implement `--gen-tutorial` Flag**
-    - **Status:** **Done.**
-    - **Details:** `aider-vertex --gen-tutorial` generates a nested monorepo stub with `mk`/`lmk` scripts to verify path resolution.
+## ✅ Completed (v1.2.0)
+- [x] **Triple-Head Architecture:** Implemented `weave-view` orchestrator.
+- [x] **Header Weaving:** Implemented `weave-headers` (Python) to scan `compile_commands.json` and symlink headers.
+- [x] **Nix Flake:** Fully hermetic build for macOS (Darwin) and Linux.
+- [x] **Docker Support:** Validated cross-compilation workflow for Apple Silicon (M1/M2).
+- [x] **Regression Suite:**
+    - [x] Unit Tests: Path rewriting, Header weaving, Naming normalization.
+    - [x] Integration Test: Full architecture verification with nested Git repo generation.
+    - [x] Cross-Platform: Suite runs on both host macOS and inside Linux Docker containers.
 
-- [x] **Implement `./dev` Orchestrator & Target Management**
-    - **Status:** **Done.**
-    - **Details:** The `dev` script parses targets, weaves views, manages the Git Bridge, and intelligently links nested `.ddd` configs.
+## 🚀 Upcoming (v1.3.0)
+- [ ] **Dependency Graphing:** Use `cscope` or `clang-query` to pull in `.c` implementation files (not just headers) for deeper context.
+- [ ] **Ghost-Writing:** Allow the AI to "request" files it cannot see, triggering a dynamic fetch into the Virtual View.
+- [ ] **LSP Integration:** Hook up `clangd` inside the Virtual View to validate AI edits before they are committed.
+- [ ] **CI Automation:** Move the `docker run` regression test into GitHub Actions.
 
-- [x] **Implement Nested DDD Linking (Multi-View Support)**
-    - **Status:** **Done.**
-    - **Details:** Verified by `verify_arch.sh`. Support for "Nested Sovereignty" (Global vs. Local Daemons) is active.
-
-## 🛠️ Reliability & "The Doctor"
-- [x] **Implement "The Doctor" (Pre-Flight Checks)**
-    - **Status:** **Done.**
-    - **Details:** `aider-vertex` now runs `check_health()` on startup. Verifies Credentials, Toolchain, and DDD Interface writability. Warns on stale locks or missing `.ddd`.
-
-- [x] **Dynamic Configuration Generation**
-    - **Status:** **Done.**
-    - **Details:** `main.py` generates a temporary `.aider.conf.yml` at runtime, resolving the absolute path to `test-cmd` (`.ddd/wait`) relative to the current view.
-
-## 🐛 Bugs & Edge Cases
-- [x] **Fix `weave-view` Path Mismatch in Docker**
-    - **Status:** **Done.**
-    - **Details:** `weave-view` now auto-detects path mismatches between the host JSON and the container environment, using `sed` to rewrite paths to `/data` before filtering.
-
-- [x] **Analyze Clang-Tidy Include Path Strategy**
-    - **Status:** **Done.**
-    - **Details:** Implemented `weave-headers` (Python) to parse `compile_commands.json` and symlink repo-internal headers into `_sys/includes`. External headers are reported to stdout. Verified with `tests/unit/test_header_weaving.sh`.
-
-- [x] **Fix `weave-view` Redundant Naming**
-    - **Status:** **Done.**
-    - **Details:** Updated `./dev` script to check if the target name already starts with `view-` before prepending it. Verified with `tests/unit/test_naming_normalization.sh`.
+## 🐛 Known Issues / Notes
+- **Git Identity in Tests:** The integration test sets a dummy global git identity when running inside Docker. This is protected by a check for `/.dockerenv`.
+- **Permissions:** When running tests in Docker via volume mounts, `chmod +x` is unreliable. Mocks are generated in `/tmp` to work around this.

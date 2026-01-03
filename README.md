@@ -1,101 +1,124 @@
-# Aider-Vertex: Agentic C/C++ Development Environment
+# Aider-Vertex (v1.2.0)
 
-**Aider-Vertex** is a specialized development environment that bridges [Aider](https://aider.chat/) (using Google Vertex AI / Gemini 1.5 Pro) with a robust, containerized C/C++ toolchain.
+**Aider-Vertex** is a specialized fork of [Aider](https://aider.chat) designed for high-performance, hermetic C/C++ development using Google's **Vertex AI (Gemini 2.5)** models.
 
-It solves the "Context Window Problem" for large monorepos by using **Virtual Views**: dynamically generated, self-contained slices of your codebase that allow the AI to build, test, and debug specific components without being overwhelmed by the entire repository.
+It introduces a **Triple-Head Architecture** that separates the AI's "Context View" from the actual source code, allowing for safe, hallucination-free editing of complex monorepos without polluting the source tree.
 
 ## 🚀 Key Features
 
-* **Virtual Views (`weave-view`):** Instantly create a symlinked sandbox containing only the source code relevant to a specific task.
-* **Header Weaving:** Automatically analyzes `compile_commands.json` to find and link hidden internal headers, enabling `clang-tidy` and LSP tools to work correctly inside a partial view.
-* **The Orchestrator (`./dev`):** A unified script to manage views, link the correct debug daemons (`.ddd`), and launch the AI agent.
-* **Triple-Head Debugging:**
-    * **Head 1 (AI):** Edits code and runs builds in the container.
-    * **Head 2 (Human):** Reviews changes in `view-<name>/` using Neovim/VSCode.
-    * **Head 3 (Daemon):** A shared `.ddd` socket manages build locks and test signaling.
-* **Hermetic Toolchain:** Powered by **Nix** and **Devbox** to ensure identical tools (GCC, Clang, CMake, Python) on macOS and Linux.
+* **Triple-Head Architecture:**
+    * **Source Head:** Your actual git repo (untouched).
+    * **View Head:** A temporary, ephemeral "virtual view" containing only the relevant source files and their headers.
+    * **Build Head:** An isolated build environment (Docker/Nix) linked to the View Head.
+* **Header Weaving:** Automatically detects `#include` directives in your C files and symlinks the correct headers into the Virtual View, ensuring the AI (and LSP) can "see" definitions without needing the entire repo.
+* **Hermetic Toolchain:** Fully packaged with Nix. Zero dependencies on the host system other than Nix itself.
+* **Vertex AI Integration:** Optimized for `gemini-2.5-pro` and `gemini-2.5-flash` on Google Cloud Vertex AI.
 
----
+## 📦 Installation & Build
 
-## 🛠️ Installation
+### Option 1: Using Nix (Recommended for Devs)
 
-**Prerequisites:**
-1.  [Nix](https://nixos.org/download.html) (Package Manager)
-2.  [Devbox](https://www.jetify.com/devbox/docs/installing_devbox/) (Environment Manager)
-3.  Google Cloud Credentials (for Vertex AI)
+Enter the hermetic development shell. This provides `python3`, `gcc`, `jq`, and all project tools.
 
-**Setup:**
 ```bash
-# 1. Clone the repo
-git clone https://github.com/your-username/aider-vertex.git
-cd aider-vertex
-
-# 2. Enter the Shell (Installs all dependencies)
-devbox shell
-# or if using direnv:
-direnv allow
+nix develop
+# You are now in a shell with 'aider-vertex', 'weave-view', and test tools available.
 ```
 
----
+### Option 2: Building the Docker Image
 
-## 🎮 Usage
+The project builds a hermetic Docker image containing the full toolchain.
 
-### 1. The "Full" Mode
-To work on the entire repository (useful for architectural refactors):
+**On Linux (Native):**
 ```bash
-./dev full
+nix build .#docker
+docker load < result
 ```
 
-### 2. Targeted Views (Recommended)
-To work on a specific component (e.g., "backend"), first define a **Target**:
+**On macOS (Apple Silicon / M1+):**
+Since macOS cannot build Linux binaries natively, use this bootstrap command:
 
-**File:** `targets/backend.txt`
-```text
-src/backend
-libs/common
-tests/backend_tests.cpp
-```
-
-Then, launch the orchestrator:
 ```bash
-./dev backend
+docker run --rm \
+    --platform linux/arm64 \
+    -v "$(pwd):/app" -w /app \
+    nixos/nix \
+    bash -c "nix --extra-experimental-features 'nix-command flakes' build .#docker > /dev/null && cat result" > aider-vertex-docker.tar.gz
+
+docker load < aider-vertex-docker.tar.gz
 ```
-**What happens next?**
-1.  The script creates `view-backend/`.
-2.  It symlinks only the paths listed in `targets/backend.txt`.
-3.  It scans `compile_commands.json` and automatically links required headers (Header Weaving).
-4.  It launches Aider inside `view-backend/`, treating it as the repo root.
 
-### 3. Verification & Tests
-The project includes a full regression suite to verify the environment, path rewriting, and weaving logic.
+### Option 3: Pull from GitHub Container Registry (Fastest)
 
+If you do not want to build the image yourself, you can pull the pre-built release:
+
+```bash
+docker pull ghcr.io/<YOUR_USERNAME>/aider-vertex:latest
+```
+
+*(Note: Replace `<YOUR_USERNAME>` with your GitHub username or organization).*
+
+## 🧪 Testing
+
+The project includes a comprehensive regression suite that verifies path rewriting, header weaving, and the Triple-Head architecture.
+
+**Run Locally (macOS/Linux):**
 ```bash
 ./tests/run_all.sh
 ```
 
----
+**Run in Docker (Release Verification):**
+This verifies the image behaves correctly in a containerized environment (simulating CI/Production).
 
-## 🏗️ Architecture
-
-### Directory Structure
-```text
-.
-├── bin/                # Custom Tools (weave-view, weave-headers)
-├── targets/            # User-defined view definitions (*.txt)
-├── tests/              # Regression Suite (Unit & Integration)
-├── dev                 # The Orchestrator Script
-├── devbox.json         # Environment Definition
-├── flake.nix           # Nix Dependency Lock
-└── view-*/             # (Git Ignored) Generated Virtual Views
+```bash
+docker run --rm \
+  --platform linux/arm64 \
+  --entrypoint /bin/bash \
+  -v "$(pwd):/data" \
+  aider-vertex:latest \
+  -c "./tests/run_all.sh"
 ```
 
-### The "Git Bridge"
-Even though Aider runs inside `view-backend/`, it still commits to your real git repository. The orchestrator sets `GIT_DIR` and `GIT_WORK_TREE` environment variables so the AI's commits are applied to the real source files, not the symlinks.
+## 🛠 Usage
 
----
+### 1. The `dev` Orchestrator
+The primary entry point is the `dev` script. It creates a Virtual View for your target and launches Aider.
 
-## 🔧 Troubleshooting
+```bash
+# Edit a specific file/module
+./dev path/to/target_file.c
 
-* **"Weave-view not found":** Ensure you are inside the `devbox shell`.
-* **Clang-Tidy errors:** Run `./dev <target>` again. The "Header Weaver" runs automatically on startup to catch new includes.
-* **Docker/Path issues:** The tools automatically rewrite host paths (macOS `/var/...`) to container paths. If issues persist, check `tests/unit/test_docker_rewrite.sh`.
+# The tool will:
+# 1. Create directory 'view-target_file'
+# 2. Symlink the source file there
+# 3. Weave required headers into 'view-target_file/_sys/includes'
+# 4. Launch Aider inside the view
+```
+
+### 2. Manual View Creation
+You can manually create views for inspection:
+
+```bash
+# Create a view for 'src/main.c'
+bin/weave-view main src/main.c
+
+# Inspect the result
+ls -R view-main/
+```
+
+## 🏗 Architecture
+
+```text
+[ HOST FILESYSTEM ]        [ VIRTUAL VIEW ]             [ AI AGENT ]
+/repo                      /view-target                 (Aider)
+├── src/                   ├── src/                     See:
+│   └── main.c  <---link---|   └── main.c               - main.c
+├── include/               └── _sys/                    - _sys/includes/foo.h
+│   └── foo.h   <---link-------includes/
+│                               └── foo.h
+```
+
+The AI *thinks* it is editing a small, self-contained project. In reality, it is editing symlinks that point back to your monorepo.
+
+## 📜 License
+Apache 2.0

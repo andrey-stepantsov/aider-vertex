@@ -3,15 +3,16 @@ set -e
 
 # Setup Mock Environment
 TEST_DIR=$(mktemp -d)
-# Resolve canonical path for the root immediately to avoid /var vs /private/var mismatch
+# Docker-Compatible Path Resolution
 REAL_TEST_DIR=$(python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$TEST_DIR")
 
 REPO_ROOT="$REAL_TEST_DIR/repo"
 EXTERNAL_ROOT="$REAL_TEST_DIR/external_sdk"
 BIN_WEAVE="$(pwd)/bin/weave-view"
 
-# Ensure we use the local bin/weave-headers if it exists
-export PATH="$(pwd)/bin:$PATH"
+# FIX: Do NOT export local bin to PATH.
+# This avoids 'command -v' finding a non-executable file.
+# We rely on weave-view's internal logic to find the sibling script.
 
 echo "🧪 Testing Header Weaving & External Reporting..."
 echo "   Mock Repo: $REPO_ROOT"
@@ -37,9 +38,9 @@ cat <<JSON > "$REPO_ROOT/compile_commands.json"
 ]
 JSON
 
-# 3. Run weave-view (Only viewing 'src')
+# 3. Run weave-view (Explicit Bash Invocation)
 cd "$REPO_ROOT"
-"$BIN_WEAVE" test_view src > weave.log 2>&1 || true
+bash "$BIN_WEAVE" test_view src > weave.log 2>&1 || true
 
 # 4. Verification
 
@@ -53,12 +54,11 @@ else
     echo "--- WEAVE LOG ---"
     cat weave.log
     echo "-----------------"
-    ls -R view-test_view/_sys
+    ls -R view-test_view/_sys 2>/dev/null || echo "No _sys dir"
     exit 1
 fi
 
 # B. Check External Reporting
-# We search for the resolved path in the log
 if grep -Fq "External Include: $EXTERNAL_ROOT/include" weave.log; then
     echo "✅ [External] External SDK path was reported."
 else
