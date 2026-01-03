@@ -14,17 +14,13 @@
     - **Details:** Verified by `verify_arch.sh`. Support for "Nested Sovereignty" (Global vs. Local Daemons) is active.
 
 ## 🛠️ Reliability & "The Doctor"
-- [ ] **Implement "The Doctor" (Pre-Flight Checks)**
-    - **Goal:** Prevent startup failures by verifying the environment before launching.
-    - **Implementation:** Add `check_health` to validate:
-        1. `dd-daemon` socket is active.
-        2. Essential env vars (`VERTEXAI_PROJECT`, `VERTEXAI_LOCATION`) are set.
-        3. `weave-view` binary is in PATH.
-    - **Benefit:** Fails fast with helpful error messages.
+- [x] **Implement "The Doctor" (Pre-Flight Checks)**
+    - **Status:** **Done.**
+    - **Details:** `aider-vertex` now runs `check_health()` on startup. Verifies Credentials, Toolchain, and DDD Interface writability. Warns on stale locks or missing `.ddd`.
 
-- [ ] **Dynamic Configuration Generation**
-    - **Goal:** Eliminate manual path patching in `.aider.conf.yml`.
-    - **Implementation:** Generate a temporary `.aider.conf.yml` at runtime that hardcodes the absolute path to `test-cmd: .../.ddd/wait`.
+- [x] **Dynamic Configuration Generation**
+    - **Status:** **Done.**
+    - **Details:** `main.py` generates a temporary `.aider.conf.yml` at runtime, resolving the absolute path to `test-cmd` (`.ddd/wait`) relative to the current view.
 
 ## 🐛 Bugs & Edge Cases
 - [ ] **Analyze Clang-Tidy Include Path Strategy**
