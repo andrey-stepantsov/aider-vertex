@@ -1,0 +1,59 @@
+#!/bin/bash
+set -e
+
+# ./dev - The Aider-Vertex Orchestrator
+# Usage: ./dev <target_name> | ./dev full
+
+if [ -z "$1" ]; then
+    echo "Usage: ./dev <target> | ./dev full"
+    echo "Available targets (in targets/):"
+    if [ -d "targets" ]; then
+        ls targets/ 2>/dev/null | sed 's/\.txt//'
+    else
+        echo "  (No targets/ directory found)"
+    fi
+    exit 1
+fi
+
+TARGET="$1"
+
+# --- 1. Resolve Target ---
+if [ "$TARGET" == "full" ]; then
+    echo "🚀 Launching Full Context (Root Mode)..."
+    aider-vertex
+    exit 0
+fi
+
+TARGET_FILE="targets/${TARGET}.txt"
+if [ ! -f "$TARGET_FILE" ]; then
+    echo "❌ Error: Target definition '$TARGET_FILE' not found."
+    exit 1
+fi
+
+# --- 2. Read Patterns ---
+echo "📖 Reading target: $TARGET"
+# Read lines into array, handling missing newline at EOF
+mapfile -t PATHS < "$TARGET_FILE"
+
+# --- 3. Weave View ---
+VIEW_NAME="view-${TARGET}"
+# weave-view handles the "view-" prefix logic safely now, but we construct
+# the name here to know where to cd into.
+echo "🧵 Weaving view: $VIEW_NAME"
+
+# Check for weave-view (it should be in PATH via Nix/Docker)
+if ! command -v weave-view &> /dev/null; then
+    echo "❌ Error: 'weave-view' not found. Are you in the devbox/docker env?"
+    exit 1
+fi
+
+# Pass the paths array to weave-view
+weave-view "$TARGET" "${PATHS[@]}"
+
+# --- 4. Launch Aider ---
+echo "🚀 Launching Aider into $VIEW_NAME..."
+cd "$VIEW_NAME"
+
+# Execute aider-vertex
+# The smart wrapper will detect we are in a subdir and find .ddd/wait in ../
+aider-vertex

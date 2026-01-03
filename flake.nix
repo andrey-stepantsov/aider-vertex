@@ -37,14 +37,22 @@
             doCheck = false;
           };
 
-          # --- 2. The Weaver Script ---
+          # --- 2. The Weaver Script (Fixed) ---
           weave-view = pkgs.writeShellScriptBin "weave-view" ''
             set -e
             if [ "$#" -lt 2 ]; then
               echo "Usage: weave-view <view-name> <src-dir1> [src-dir2...] [--sys <sdk-dir1>...]"
               exit 1
             fi
-            VIEW_NAME="view-$1"; shift
+            
+            # FIX: Redundant Naming Check
+            INPUT_NAME="$1"; shift
+            if [[ "$INPUT_NAME" == view-* ]]; then
+                VIEW_NAME="$INPUT_NAME"
+            else
+                VIEW_NAME="view-$INPUT_NAME"
+            fi
+            
             echo "🧵 Weaving virtual view: $VIEW_NAME"
             mkdir -p "$VIEW_NAME/_sys"
 
@@ -78,6 +86,14 @@
                COUNT=$(echo "$UNIQUE_DBS" | wc -l)
                echo "   [i] Merging $COUNT compilation databases..."
                echo "$UNIQUE_DBS" | xargs ${pkgs.jq}/bin/jq -s "add | [.[] | select($JQ_ARGS)]" > "$VIEW_NAME/compile_commands.json"
+               
+               # FIX: Path Safety Check (Docker/Host Mismatch)
+               # Detects if we are in Docker but the DB contains MacOS/Host paths
+               if grep -q "/Users/" "$VIEW_NAME/compile_commands.json" && [ -f /.dockerenv ]; then
+                  echo "   [!] WARNING: Host paths (/Users/...) detected in Docker."
+                  echo "       Aider will not find these files unless you rewrite paths or use /data mounting."
+               fi
+               
                echo "   [✓] Master compile_commands.json created."
             else
                echo "   [!] No compilation databases found (or ignored)."

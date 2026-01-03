@@ -9,7 +9,11 @@
   "shell": {
     "init_hook": [
       "echo '🚀 Agentic CI Environment Loaded'",
-      "echo 'Ensure you are logged in: gh auth status'"
-    ]
+      "echo 'Ensure you are logged in: gh auth status'",
+      "chmod +x dev ci-loop.sh"
+    ],
+    "scripts": {
+      "dev": "./dev"
+    }
   }
 }
