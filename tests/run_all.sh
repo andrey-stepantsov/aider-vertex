@@ -12,6 +12,10 @@ echo "👉 [Unit] Header Weaving"
 ./tests/unit/test_header_weaving.sh
 
 echo "---------------------------------------------------"
+echo "👉 [Unit] Naming Normalization"
+./tests/unit/test_naming_normalization.sh
+
+echo "---------------------------------------------------"
 echo "👉 [Integration] Architecture & Orchestrator"
 ./tests/integration/test_architecture.sh
 

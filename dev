@@ -30,7 +30,13 @@ echo "📖 Reading target: $TARGET"
 mapfile -t PATHS < "$TARGET_FILE"
 
 # --- 2. Weave the View ---
-VIEW_NAME="view-${TARGET}"
+# FIX: Normalize View Name to match weave-view logic (idempotent prefix)
+if [[ "$TARGET" == view-* ]]; then
+    VIEW_NAME="$TARGET"
+else
+    VIEW_NAME="view-${TARGET}"
+fi
+
 echo "🧵 Weaving view: $VIEW_NAME"
 
 if ! command -v weave-view &> /dev/null; then
@@ -39,6 +45,7 @@ if ! command -v weave-view &> /dev/null; then
 fi
 
 # Create the view (This defaults to linking the ROOT .ddd)
+# weave-view handles the prefixing internally too, but we need the result for 'cd'
 weave-view "$TARGET" "${PATHS[@]}" "${EXTRA_ARGS[@]}"
 
 # --- 3. Smart DDD Linking (Nested Sovereignty) ---
@@ -71,6 +78,11 @@ if [ -n "$CANDIDATE_DDD" ] && [ "$CANDIDATE_DDD" != "$REPO_ROOT/.ddd" ]; then
 fi
 
 # --- 4. Enter the Jail ---
+if [ ! -d "$VIEW_NAME" ]; then
+    echo "❌ Error: View directory '$VIEW_NAME' was not created."
+    exit 1
+fi
+
 cd "$VIEW_NAME"
 
 # --- 5. The Git Bridge ---
