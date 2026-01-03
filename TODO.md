@@ -1,15 +1,26 @@
 # Project TODOs
 
-## 🐛 Bugs & Reliability
-- [ ] **Fix `weave-view` Path Mismatch in Docker**
-    - **Issue:** When running inside Docker (path `/data`) with a Host-generated `compile_commands.json` (path `/Users/...`), `weave-view` filters out all entries because the paths do not match the `startswith` filter. This results in an empty JSON file and zero AI context.
-    - **Short-term Fix:** Add a check to `weave-view` that prints a warning if the resulting `compile_commands.json` contains 0 entries.
-    - **Long-term Fix:** Add a `--path-map <host_prefix>:<container_prefix>` argument to `weave-view` to rewrite paths on the fly during the merge step.
-    - **Auto-magic:** Detect container environment and auto-patch paths if a common prefix mismatch is found.
+## 🧠 Feature Enhancements (New)
+- [ ] **Implement `--gen-tutorial` Flag**
+    - **Goal:** Allow users to bootstrap a test environment without cloning the repo or finding external scripts.
+    - **Behavior:**
+        1. When `aider-vertex --gen-tutorial` is run:
+        2. Check if the current directory is safe (empty or explicitly allowed).
+        3. Write the `tutorial-stub/` file structure (Makefile, src/app, src/math, .ddd/config, targets/) to `$PWD`.
+        4. Initialize a git repo locally (if git is available).
+        5. Exit with instructions: "Run './dev full' to start."
+    - **Benefit:** Works identically in Docker (`-v $(pwd):/data`) and Nix (`$PWD`), zero dependencies.
 
-- [ ] **Fix `weave-view` Redundant Naming**
-    - **Issue:** The script unconditionally prepends `view-` to the user-supplied name. If a user runs `weave-view view-app ...`, it creates `view-view-app`, which is confusing.
-    - **Fix:** Update `flake.nix` to check if the argument already starts with `view-` before prepending it.
+- [ ] **Auto-Init Ephemeral Git Session**
+    - **Issue:** When running in `weave-view` (no `.git` folder), Aider defaults to `--no-git`, disabling `/undo`, auto-commits, and diffs.
+    - **Goal:** Automatically initialize a temporary, session-local git environment on startup.
+    - **Implementation Details:**
+        1. Entrypoint checks if `.git` exists in `/data`.
+        2. If not:
+           - Run `git init`.
+           - Configure a dummy user (e.g., `user.email "aider@session.local"`).
+           - Create a baseline commit (`git add . && git commit -m "Baseline"`).
+    - **Benefit:** Restores full Aider capabilities (safe experimentation with undo) without risking the actual monorepo history.
 
 ## 🛠️ Deployment & Experience
 - [ ] **Implement `./dev` Orchestrator & Target Management**
@@ -41,14 +52,12 @@
         4. Mount it into the container as `/data/.aider.conf.yml`.
     - **Benefit:** Ensures `test-cmd` always works regardless of the directory Aider starts in.
 
-## 🧠 Feature Enhancements
-- [ ] **Auto-Init Ephemeral Git Session**
-    - **Issue:** When running in `weave-view` (no `.git` folder), Aider defaults to `--no-git`, disabling `/undo`, auto-commits, and diffs.
-    - **Goal:** Automatically initialize a temporary, session-local git environment on startup.
-    - **Implementation Details:**
-        1. Entrypoint checks if `.git` exists in `/data`.
-        2. If not:
-           - Run `git init`.
-           - Configure a dummy user (e.g., `user.email "aider@session.local"`).
-           - Create a baseline commit (`git add . && git commit -m "Baseline"`).
-    - **Benefit:** Restores full Aider capabilities (safe experimentation with undo) without risking the actual monorepo history.
+## 🐛 Bugs & Reliability
+- [ ] **Fix `weave-view` Path Mismatch in Docker**
+    - **Issue:** Host-generated `compile_commands.json` paths do not match Docker paths, resulting in empty context.
+    - **Short-term Fix:** Warn if `compile_commands.json` is empty.
+    - **Long-term Fix:** Add path rewriting (Host -> Container paths).
+
+- [ ] **Fix `weave-view` Redundant Naming**
+    - **Issue:** Script double-prefixes names (e.g., `view-view-app`).
+    - **Fix:** Check if prefix exists before adding it in `flake.nix`.
