@@ -4,7 +4,8 @@
     "poetry",
     "github-cli",
     "jq",
-    "git"
+    "git",
+    "bash"
   ],
   "shell": {
     "init_hook": [
@@ -12,15 +13,17 @@
       "echo 'Ensure you are logged in: gh auth status'",
       "chmod +x dev ci-loop.sh",
       
-      "# --- Auto-Install Logic ---",
-      "if [ ! -d .venv ]; then",
-      "  echo '📦 First run detected. Installing dependencies...'",
+      "# --- Auto-Repair Logic ---",
+      "if [ ! -f .venv/bin/aider-vertex ]; then",
+      "  echo '📦 Binary not found. Installing project in editable mode...'",
+      "  poetry config virtualenvs.in-project true",
       "  poetry install",
       "fi",
       
-      "# --- Activation Logic ---",
-      "source $(poetry env info --path)/bin/activate",
-      "echo '✅ Virtual environment activated. Run: ./dev full'"
+      "# --- Activation Logic (Safe) ---",
+      "# We do NOT exec bash here, because it breaks tools that use PTYs (like Aider).",
+      "export PATH=$PWD/bin:$PATH",
+      "source .venv/bin/activate"
     ],
     "scripts": {
       "dev": "./dev"

@@ -1,23 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 # ./dev - The Aider-Vertex Orchestrator
-# Usage: ./dev <target_name> | ./dev full
+# Usage: ./dev <target> [extra_flags]
 
 if [ -z "$1" ]; then
-    echo "Usage: ./dev <target> | ./dev full"
-    echo "Available targets (in targets/):"
-    if [ -d "targets" ]; then
-        ls targets/ 2>/dev/null | sed 's/\.txt//'
-    else
-        echo "  (No targets/ directory found)"
-    fi
+    echo "Usage: ./dev <target> [--sys /path/to/includes]"
     exit 1
 fi
 
-TARGET="$1"
+TARGET="$1"; shift
+# Capture remaining args (like --sys) to pass to weave-view
+EXTRA_ARGS=("$@")
 
-# --- 1. Resolve Target ---
+# --- 1. Target Resolution ---
 if [ "$TARGET" == "full" ]; then
     echo "🚀 Launching Full Context (Root Mode)..."
     aider-vertex
@@ -30,30 +26,64 @@ if [ ! -f "$TARGET_FILE" ]; then
     exit 1
 fi
 
-# --- 2. Read Patterns ---
 echo "📖 Reading target: $TARGET"
-# Read lines into array, handling missing newline at EOF
 mapfile -t PATHS < "$TARGET_FILE"
 
-# --- 3. Weave View ---
+# --- 2. Weave the View ---
 VIEW_NAME="view-${TARGET}"
-# weave-view handles the "view-" prefix logic safely now, but we construct
-# the name here to know where to cd into.
 echo "🧵 Weaving view: $VIEW_NAME"
 
-# Check for weave-view (it should be in PATH via Nix/Docker)
 if ! command -v weave-view &> /dev/null; then
     echo "❌ Error: 'weave-view' not found. Are you in the devbox/docker env?"
     exit 1
 fi
 
-# Pass the paths array to weave-view
-weave-view "$TARGET" "${PATHS[@]}"
+# Create the view (This defaults to linking the ROOT .ddd)
+weave-view "$TARGET" "${PATHS[@]}" "${EXTRA_ARGS[@]}"
 
-# --- 4. Launch Aider ---
-echo "🚀 Launching Aider into $VIEW_NAME..."
+# --- 3. Smart DDD Linking (Nested Sovereignty) ---
+# Check if the target paths imply a specific nested configuration.
+# We take the first path in the target list and walk up the tree looking for .ddd
+CANDIDATE_DDD=""
+SEARCH_PATH="${PATHS[0]}"
+
+# Handle relative paths by ensuring we start from PWD
+if [[ "$SEARCH_PATH" != /* ]]; then SEARCH_PATH="$(pwd)/$SEARCH_PATH"; fi
+
+# Walk up the tree until we hit the repo root
+CURRENT_SEARCH="$SEARCH_PATH"
+REPO_ROOT="$(pwd)"
+
+while [[ "$CURRENT_SEARCH" != "$REPO_ROOT" && "$CURRENT_SEARCH" != "/" ]]; do
+    if [ -d "$CURRENT_SEARCH/.ddd" ]; then
+        CANDIDATE_DDD="$CURRENT_SEARCH/.ddd"
+        break
+    fi
+    CURRENT_SEARCH="$(dirname "$CURRENT_SEARCH")"
+done
+
+# If we found a nested .ddd (and it's not the root one we already linked), relink it.
+if [ -n "$CANDIDATE_DDD" ] && [ "$CANDIDATE_DDD" != "$REPO_ROOT/.ddd" ]; then
+    echo "   [+] Detected Nested Config: $CANDIDATE_DDD"
+    echo "   [+] Relinking View to Nested Daemon..."
+    rm "$VIEW_NAME/.ddd"
+    ln -sf "$CANDIDATE_DDD" "$VIEW_NAME/.ddd"
+fi
+
+# --- 4. Enter the Jail ---
 cd "$VIEW_NAME"
 
-# Execute aider-vertex
-# The smart wrapper will detect we are in a subdir and find .ddd/wait in ../
-aider-vertex
+# --- 5. The Git Bridge ---
+# Trick Aider into thinking this is the repo root, but give it the REAL git database.
+export GIT_DIR="$(git rev-parse --git-dir)"
+export GIT_WORK_TREE="$(git rev-parse --show-toplevel)"
+
+# --- 6. Credential Persistence ---
+if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+    export GOOGLE_APPLICATION_CREDENTIALS
+fi
+
+# --- 7. Launch ---
+echo "🚀 Launching Aider into $VIEW_NAME..."
+# --root "$PWD": Forces Aider to accept the view as its universe.
+aider-vertex --root "$PWD"

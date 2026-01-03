@@ -32,3 +32,4 @@ result
 # Do NOT use .aider* because we want to commit .aider.conf.yml
 .aider.tags.cache.v4/
 
+tutorial-stub/

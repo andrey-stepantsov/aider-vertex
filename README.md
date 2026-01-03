@@ -2,35 +2,32 @@
 
 **Aider-Vertex** is a Dockerized AI coding environment powered by Google Vertex AI (Gemini models). It is specifically engineered for refactoring **Legacy C/C++ Embedded Systems** where build dependencies (proprietary SDKs, old compilers) are complex and fragile.
 
-## 🚀 Quick Start: The "Silver Bullet" Command
+## 🚀 Quick Start: The Orchestrator
 
-To launch the environment with full access to your host's toolchains and SDKs, use this command. It mounts the necessary read-only paths so the AI sees the exact same headers as your build system.
+We use a "View-Based" development workflow. Instead of opening the entire repo, you open a targeted view defined in `targets/` files. This isolates the AI, preventing it from scanning irrelevant code while maintaining a "Triple-Head" link to your central build system.
 
-```bash
-docker run -it --rm \
-  --entrypoint bash \
-  \
-  # 1. Mount Source Code (Read/Write)
-  -v /repos/prj0/system0:/repos/prj0/system0 \
-  -w /repos/prj0/system0 \
-  \
-  # 2. Mount Legacy Toolchains (Read-Only)
-  -v /opt/rh:/opt/rh:ro \
-  -v /auto/swtools:/auto/swtools:ro \
-  -v /usr/include:/usr/include:ro \
-  -v /usr/local/include:/usr/local/include:ro \
-  \
-  # 3. Credentials
-  -v /tmp/auth.json:/root/auth.json \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/root/auth.json \
-  -e VERTEXAI_PROJECT="your-project-id" \
-  -e VERTEXAI_LOCATION="us-central1" \
-  \
-  # 4. [Optional] Mission Pack (External Scripts)
-  -v /path/to/my/local/scripts:/mission/bin:ro \
-  \
-  ghcr.io/andrey-stepantsov/aider-vertex:v1.1.5
+### 1. Define a Target
+Create a file in `targets/` listing the source directories for your task.
+**File: `targets/backend.txt`**
+```text
+src/core/math
+src/libs/utils
 ```
+
+### 2. Launch the Environment
+Run the orchestrator script to weave the view and start the AI.
+```bash
+./dev backend
+```
+* **Creates:** `view-backend/` (Symlinks to source)
+* **Links:** `.ddd/` (Connects to the global Build Daemon)
+* **Launches:** Aider with restricted vision but full Git capabilities.
+
+### 3. The Refactoring Loop
+Inside the Aider chat, you have full control:
+* **Edit:** `src/core/math/lib.c` (Changes reflect in real repo)
+* **Verify:** `/test` (Runs the global `.ddd/wait` script)
+* **Commit:** `/commit` (Commits to the real Git repo)
 
 ---
 
@@ -58,30 +55,19 @@ Legacy builds often compile the same file 5+ times (Sim, Chip A, Chip B). You mu
     ```
     *Copy the output JSON. You will paste this into the Aider chat as "System Context".*
 
-### Phase 2: Isolation (`weave-view`)
-Don't let Aider scan your entire 10GB repo. Create a virtual view containing **only** the file and its unit test.
+### Phase 2: Orchestration (`./dev`)
+Don't let Aider scan your entire 10GB repo. Use the `./dev` script to create a "View" that contains **only** the relevant files.
 
-```bash
-# Syntax: weave-view <name> <impl_file> <test_file>
-weave-view amem-fix \
-  modules/infra/amem \
-  modules/infra/amem/ut
-```
+* **View Creation:** `weave-view` creates a folder of symlinks.
+* **Git Bridge:** The environment automatically maps Git commands back to your real repo.
+* **Build Bridge:** The `.ddd` folder is linked, so `/test` runs your real Makefiles.
 
-### Phase 3: The Refactoring Loop
-Enter the view and start the AI.
+### Phase 3: The Triple-Head Architecture
+When you run `./dev backend`, the system adapts to your project structure:
 
-```bash
-cd view-amem-fix
-aider-vertex
-```
-
-**Inside the Chat:**
-1.  Paste the **System Context** (from `cc-pick`).
-2.  Use the **Mission Pack** scripts to verify changes automatically.
-    ```text
-    /run verify.sh
-    ```
+1.  **Global Context:** If your target relies on the root build system, it links the root `.ddd` config (e.g., running `make`).
+2.  **Nested Sovereignty:** If your target is a library with its own `.ddd` configuration (e.g., `libs/lib1/.ddd`), the orchestrator detects this and links the *local* daemon instead.
+3.  **Isolation:** Aider runs inside the view, seeing only the files you specified, but retains full capability to commit to the main Git repository.
 
 ---
 
@@ -97,8 +83,8 @@ aider-vertex
 ### Workspace Managers
 | Tool | Description |
 | :--- | :--- |
-| **`weave-view <name> ...`** | Creates a lightweight workspace of symlinks + a filtered `compile_commands.json`. |
-| **`show-targets`** | (Deprecated) Legacy alias for `cc-targets`. |
+| **`./dev <target>`** | The main entry point. Weaves a view, links the correct daemon, and launches Aider. |
+| **`weave-view <name> ...`** | (Internal) Creates a lightweight workspace of symlinks + a filtered `compile_commands.json`. |
 
 ### Mission Packs (`/mission/bin`)
 You can inject your own shell scripts into the container at runtime by mounting a folder to `/mission/bin`.
@@ -133,4 +119,12 @@ nix develop
 # Build the Docker image
 nix build .#docker
 docker load < result
+```
+
+### Architecture Verification
+This repository includes an automated regression test to verify the "Triple-Head" logic (View Weaving + Git Bridge + Nested Daemon Linking).
+
+```bash
+# Runs the full verification suite (generates stub, tests orchestrator)
+./verify_arch.sh
 ```

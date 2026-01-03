@@ -37,72 +37,13 @@
             doCheck = false;
           };
 
-          # --- 2. The Weaver Script (Fixed) ---
+          # --- 2. The Weaver Script (Single Source of Truth) ---
+          # We now read the script from bin/weave-view instead of defining it inline.
+          # We use substituteAll to hardcode the path to 'jq' so it works even if
+          # jq isn't in the global PATH of the container.
           weave-view = pkgs.writeShellScriptBin "weave-view" ''
-            set -e
-            if [ "$#" -lt 2 ]; then
-              echo "Usage: weave-view <view-name> <src-dir1> [src-dir2...] [--sys <sdk-dir1>...]"
-              exit 1
-            fi
-            
-            # FIX: Redundant Naming Check
-            INPUT_NAME="$1"; shift
-            if [[ "$INPUT_NAME" == view-* ]]; then
-                VIEW_NAME="$INPUT_NAME"
-            else
-                VIEW_NAME="view-$INPUT_NAME"
-            fi
-            
-            echo "🧵 Weaving virtual view: $VIEW_NAME"
-            mkdir -p "$VIEW_NAME/_sys"
-
-            JQ_ARGS=""; MODE=0
-            declare -a SRC_PATHS
-            
-            for arg in "$@"; do
-              if [ "$arg" == "--sys" ]; then MODE=1; continue; fi
-              if [[ "$arg" = /* ]]; then ABS="$arg"; else ABS="$(pwd)/$arg"; fi
-              
-              if [ $MODE -eq 0 ]; then
-                REL=$(dirname "$arg"); mkdir -p "$VIEW_NAME/$REL"
-                ln -sf "$ABS" "$VIEW_NAME/$arg"
-                SRC_PATHS+=("$ABS")
-                if [ -z "$JQ_ARGS" ]; then JQ_ARGS=".file | startswith(\"$ABS\")";
-                else JQ_ARGS="$JQ_ARGS or (.file | startswith(\"$ABS\"))"; fi
-              else
-                ln -sf "$ABS" "$VIEW_NAME/_sys/$(basename "$arg")"
-              fi
-            done
-            
-            echo "   [i] Searching for compilation databases..."
-            DB_LIST=$(mktemp)
-            if [ -f "compile_commands.json" ]; then echo "$(pwd)/compile_commands.json" >> $DB_LIST; fi
-            for path in "''${SRC_PATHS[@]}"; do
-               find "$path" -maxdepth 3 -name "compile_commands.json" >> $DB_LIST 2>/dev/null || true
-            done
-            
-            UNIQUE_DBS=$(cat $DB_LIST | sort | uniq)
-            if [ ! -z "$UNIQUE_DBS" ] && [ ! -z "$JQ_ARGS" ]; then
-               COUNT=$(echo "$UNIQUE_DBS" | wc -l)
-               echo "   [i] Merging $COUNT compilation databases..."
-               echo "$UNIQUE_DBS" | xargs ${pkgs.jq}/bin/jq -s "add | [.[] | select($JQ_ARGS)]" > "$VIEW_NAME/compile_commands.json"
-               
-               # FIX: Path Safety Check (Docker/Host Mismatch)
-               # Detects if we are in Docker but the DB contains MacOS/Host paths
-               if grep -q "/Users/" "$VIEW_NAME/compile_commands.json" && [ -f /.dockerenv ]; then
-                  echo "   [!] WARNING: Host paths (/Users/...) detected in Docker."
-                  echo "       Aider will not find these files unless you rewrite paths or use /data mounting."
-               fi
-               
-               echo "   [✓] Master compile_commands.json created."
-            else
-               echo "   [!] No compilation databases found (or ignored)."
-            fi
-            rm -f $DB_LIST
-            
-            echo "_sys/" > "$VIEW_NAME/.aiderignore"
-            if [ -f .aiderignore ]; then cat .aiderignore >> "$VIEW_NAME/.aiderignore"; fi
-            echo "✅ View Ready: cd $VIEW_NAME"
+            export PATH=${pkgs.jq}/bin:$PATH
+            ${builtins.readFile ./bin/weave-view}
           '';
 
           # --- 3. The CC Toolkit (Context Managers) ---
@@ -209,8 +150,8 @@
               pkgs.jq
               pkgs.clang-tools
               ctx-tool
-              weave-view
-              cc-targets cc-flags cc-pick # <--- The Suite
+              weave-view # Now uses bin/weave-view via the wrapper above
+              cc-targets cc-flags cc-pick
             ];
 
             fakeRootCommands = ''
