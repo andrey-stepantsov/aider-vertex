@@ -10,7 +10,17 @@
     "init_hook": [
       "echo '🚀 Agentic CI Environment Loaded'",
       "echo 'Ensure you are logged in: gh auth status'",
-      "chmod +x dev ci-loop.sh"
+      "chmod +x dev ci-loop.sh",
+      
+      "# --- Auto-Install Logic ---",
+      "if [ ! -d .venv ]; then",
+      "  echo '📦 First run detected. Installing dependencies...'",
+      "  poetry install",
+      "fi",
+      
+      "# --- Activation Logic ---",
+      "source $(poetry env info --path)/bin/activate",
+      "echo '✅ Virtual environment activated. Run: ./dev full'"
     ],
     "scripts": {
       "dev": "./dev"
