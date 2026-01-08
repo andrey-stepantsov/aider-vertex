@@ -133,10 +133,10 @@
               pkgs.openssh
               
               # --- Core Utils & Shell ---
-              pkgs.coreutils  # includes sort, cut, head, tail, cp, ls, mkdir, etc.
-              pkgs.gnused     # sed
-              pkgs.gnugrep    # grep
-              pkgs.gawk       # awk
+              pkgs.coreutils
+              pkgs.gnused
+              pkgs.gnugrep
+              pkgs.gawk
               pkgs.which
               pkgs.file
               pkgs.gzip
@@ -144,7 +144,7 @@
               
               # --- Interactive Shell Support ---
               pkgs.bashInteractive
-              pkgs.readline   # <--- Critical for arrow keys
+              pkgs.readline
               pkgs.ncurses
               pkgs.findutils
               pkgs.procps
@@ -175,18 +175,17 @@
             fakeRootCommands = ''
               mkdir -p /usr/bin /bin /etc
               
-              # 1. Shell Setup (Fixes arrow keys and environment)
+              # 1. Shell Setup
               ln -sf ${pkgs.coreutils}/bin/env /usr/bin/env
               ln -sf ${pkgs.bashInteractive}/bin/bash /bin/bash
               ln -sf ${pkgs.bashInteractive}/bin/sh /bin/sh
               
-              # Create inputrc to ensure readline works correctly
               echo '"\e[A": history-search-backward' > /etc/inputrc
               echo '"\e[B": history-search-forward' >> /etc/inputrc
               echo 'set show-all-if-ambiguous on' >> /etc/inputrc
               echo 'set completion-ignore-case on' >> /etc/inputrc
 
-              # 2. Symlink Critical Tools to /bin (Fixes "command not found" in wrappers)
+              # 2. Symlink Critical Tools to /bin
               ln -sf ${pkgs.git}/bin/git /bin/git
               ln -sf ${pkgs.jq}/bin/jq /bin/jq
               ln -sf ${pkgs.vim}/bin/vim /bin/vim
@@ -197,7 +196,7 @@
               ln -sf ${pkgs.gnused}/bin/sed /bin/sed
               ln -sf ${pkgs.gawk}/bin/awk /bin/awk
               
-              # Coreutils Symlinks (Explicitly link commonly used ones)
+              # Coreutils Symlinks
               ln -sf ${pkgs.coreutils}/bin/ls /bin/ls
               ln -sf ${pkgs.coreutils}/bin/cp /bin/cp
               ln -sf ${pkgs.coreutils}/bin/mv /bin/mv
@@ -233,13 +232,14 @@
                 "PYTHONUTF8=1"
                 "LC_ALL=C.UTF-8"
                 "LANG=C.UTF-8"
-                "TERM=xterm-256color"  # <--- Essential for vim/arrow keys
+                "TERM=xterm-256color"
                 "C_INCLUDE_PATH=${pkgs.glibc.dev}/include"
                 "CPLUS_INCLUDE_PATH=${pkgs.gcc.cc}/include/c++/${pkgs.gcc.version}"
               ];
             };
-          });
-        });
+          }; # <--- CORRECTED: Closes dockerTools.buildLayeredImage
+        } # <--- CORRECTED: Closes 'in {' set
+      ); # <--- CORRECTED: Closes forAllSystems
 
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
