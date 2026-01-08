@@ -7,7 +7,7 @@ from aider.main import main as aider_main
 from .doctor import check_health
 from .tutorial import generate_tutorial
 
-WRAPPER_VERSION = "1.2.0"
+WRAPPER_VERSION = "1.2.1"
 
 def get_aider_version():
     try:
