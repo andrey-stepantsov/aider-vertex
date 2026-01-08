@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.2.0)";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.2.1)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -127,24 +127,39 @@
 
             contents = [ 
               app
-              pkgs.python3 # <--- ADDED: Explicit Python Interpreter 
-              pkgs.cacert pkgs.coreutils 
-              pkgs.git pkgs.openssh
+              pkgs.python3
+              pkgs.cacert 
+              pkgs.git 
+              pkgs.openssh
               
-              # Standard Utils
-              pkgs.gnused pkgs.gnugrep pkgs.gawk 
-              pkgs.which pkgs.file pkgs.gzip pkgs.gnutar
+              # --- Core Utils & Shell ---
+              pkgs.coreutils  # includes sort, cut, head, tail, cp, ls, mkdir, etc.
+              pkgs.gnused     # sed
+              pkgs.gnugrep    # grep
+              pkgs.gawk       # awk
+              pkgs.which
+              pkgs.file
+              pkgs.gzip
+              pkgs.gnutar
               
-              # Interactive
-              pkgs.bashInteractive pkgs.findutils pkgs.procps
-              pkgs.less pkgs.ncurses pkgs.vim pkgs.neovim
+              # --- Interactive Shell Support ---
+              pkgs.bashInteractive
+              pkgs.readline   # <--- Critical for arrow keys
+              pkgs.ncurses
+              pkgs.findutils
+              pkgs.procps
+              pkgs.less
+              
+              # --- Editors ---
+              pkgs.vim 
+              pkgs.neovim
 
-              # Toolchain
+              # --- Toolchain ---
               pkgs.gcc
               pkgs.glibc.dev 
               pkgs.clang
               
-              # Toolkit
+              # --- Toolkit ---
               pkgs.ripgrep
               pkgs.ast-grep
               pkgs.universal-ctags
@@ -158,11 +173,44 @@
             ];
 
             fakeRootCommands = ''
-              mkdir -p /usr/bin
-              ln -s ${pkgs.coreutils}/bin/env /usr/bin/env
-              ln -sf ${pkgs.bashInteractive}/bin/bash /bin/bash
+              mkdir -p /usr/bin /bin /etc
               
-              # --- Mission Pack Support ---
+              # 1. Shell Setup (Fixes arrow keys and environment)
+              ln -sf ${pkgs.coreutils}/bin/env /usr/bin/env
+              ln -sf ${pkgs.bashInteractive}/bin/bash /bin/bash
+              ln -sf ${pkgs.bashInteractive}/bin/sh /bin/sh
+              
+              # Create inputrc to ensure readline works correctly
+              echo '"\e[A": history-search-backward' > /etc/inputrc
+              echo '"\e[B": history-search-forward' >> /etc/inputrc
+              echo 'set show-all-if-ambiguous on' >> /etc/inputrc
+              echo 'set completion-ignore-case on' >> /etc/inputrc
+
+              # 2. Symlink Critical Tools to /bin (Fixes "command not found" in wrappers)
+              ln -sf ${pkgs.git}/bin/git /bin/git
+              ln -sf ${pkgs.jq}/bin/jq /bin/jq
+              ln -sf ${pkgs.vim}/bin/vim /bin/vim
+              ln -sf ${pkgs.neovim}/bin/nvim /bin/nvim
+              
+              # Text Processing Symlinks
+              ln -sf ${pkgs.gnugrep}/bin/grep /bin/grep
+              ln -sf ${pkgs.gnused}/bin/sed /bin/sed
+              ln -sf ${pkgs.gawk}/bin/awk /bin/awk
+              
+              # Coreutils Symlinks (Explicitly link commonly used ones)
+              ln -sf ${pkgs.coreutils}/bin/ls /bin/ls
+              ln -sf ${pkgs.coreutils}/bin/cp /bin/cp
+              ln -sf ${pkgs.coreutils}/bin/mv /bin/mv
+              ln -sf ${pkgs.coreutils}/bin/rm /bin/rm
+              ln -sf ${pkgs.coreutils}/bin/mkdir /bin/mkdir
+              ln -sf ${pkgs.coreutils}/bin/cat /bin/cat
+              ln -sf ${pkgs.coreutils}/bin/sort /bin/sort
+              ln -sf ${pkgs.coreutils}/bin/cut /bin/cut
+              ln -sf ${pkgs.coreutils}/bin/head /bin/head
+              ln -sf ${pkgs.coreutils}/bin/tail /bin/tail
+              ln -sf ${pkgs.coreutils}/bin/chmod /bin/chmod
+              
+              # 3. Mission Pack Support
               mkdir -p /mission/bin
               chmod 755 /mission/bin
               
@@ -170,6 +218,10 @@
               echo 'export PATH=$PATH:/mission/bin' >> /root/.bashrc
               mkdir -p /etc
               echo 'export PATH=$PATH:/mission/bin' >> /etc/bashrc
+
+              # 4. Git Ownership Fix
+              echo "[safe]" > /etc/gitconfig
+              echo "    directory = *" >> /etc/gitconfig
             '';
 
             config = {
@@ -181,12 +233,12 @@
                 "PYTHONUTF8=1"
                 "LC_ALL=C.UTF-8"
                 "LANG=C.UTF-8"
-                "TERM=xterm-256color"
+                "TERM=xterm-256color"  # <--- Essential for vim/arrow keys
                 "C_INCLUDE_PATH=${pkgs.glibc.dev}/include"
                 "CPLUS_INCLUDE_PATH=${pkgs.gcc.cc}/include/c++/${pkgs.gcc.version}"
               ];
             };
-          };
+          });
         });
 
       devShells = forAllSystems (system: {
@@ -221,7 +273,7 @@
           ];
           
           shellHook = ''
-            echo "🚀 Aider-Vertex v1.1.5 Environment Ready"
+            echo "🚀 Aider-Vertex v1.2.1 Environment Ready"
             echo "   Context Tools:"
             echo "     cc-targets <file>          - List build targets"
             echo "     cc-flags   <file> [regex]  - Inspect flags"
