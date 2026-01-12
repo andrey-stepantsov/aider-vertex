@@ -7,7 +7,7 @@ from pathlib import Path
 def check_health():
     """
     Performs pre-flight checks for the Aider-Vertex environment.
-    Verifies Credentials, Toolchain, and the DDD Interface.
+    Verifies Credentials, Toolchain, and the DDD Interface (v0.6.0+).
     Returns True if healthy, False otherwise.
     """
     print("👨‍⚕️  Running Pre-Flight Checks (The Doctor)...")
@@ -40,7 +40,7 @@ def check_health():
     else:
         print("   [✓] Toolchain: git, jq, weave-view found.")
 
-    # --- 3. DDD Interface (The Triple Head) ---
+    # --- 3. DDD Interface (v0.6.0 Project-Local) ---
     # Logic: Walk up from CWD to find .ddd
     cwd = Path.cwd()
     ddd_dir = None
@@ -59,14 +59,29 @@ def check_health():
         else:
             print(f"   [✓] DDD: Interface linked at {ddd_dir}")
             
-        # Check 3B: Stale Lock Warning
-        lock_file = ddd_dir / "run.lock"
-        if lock_file.exists():
+        # Check 3B: Runtime State (v0.6.0+)
+        # The daemon now uses .ddd/run/ for locks and logs.
+        run_dir = ddd_dir / "run"
+        ipc_lock = run_dir / "ipc.lock"
+        
+        # Check for legacy lock file (Migration Warning)
+        legacy_lock = ddd_dir / "run.lock"
+        if legacy_lock.exists():
+             warnings.append(f"⚠️  Legacy lock file found ({legacy_lock}). Please delete it.")
+
+        # Check for active IPC lock
+        if ipc_lock.exists():
             # If lock is older than 5 minutes, warn
-            if time.time() - lock_file.stat().st_mtime > 300:
-                warnings.append(f"⚠️  Stale lock file detected ({lock_file}). The daemon might be stuck.")
+            if time.time() - ipc_lock.stat().st_mtime > 300:
+                warnings.append(f"⚠️  Stale IPC lock detected ({ipc_lock}). The daemon might be stuck.")
             else:
-                print("   [i] Daemon is currently BUSY (run.lock exists).")
+                print("   [i] Daemon is currently BUSY (IPC lock active).")
+        
+        # Check for Build Log
+        build_log = run_dir / "build.log"
+        if build_log.exists():
+             print(f"   [i] Build log found ({build_log}).")
+
     else:
         # It is valid to run without DDD (e.g. standard Aider use), but worthy of a warning
         # if the user expects the "Triple-Head" integration.
