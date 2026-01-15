@@ -60,12 +60,13 @@
               "Defines: \(.arguments | map(select(startswith("-D"))) | length) flags"' compile_commands.json
           '';
 
+          # FIX: Escaped ''${2:-.*} to prevent Nix interpolation error
           cc-flags = pkgs.writeShellScriptBin "cc-flags" ''
             if [ -z "$1" ]; then 
               echo "Usage: cc-flags <filename> [regex]"
               exit 1
             fi
-            FLAG_REGEX="${2:-.*}"
+            FLAG_REGEX="''${2:-.*}"
             ${pkgs.jq}/bin/jq -r --arg f "$1" --arg re "$FLAG_REGEX" '
               .[] | select(.file | contains($f)) |
               "==================================================",
@@ -299,7 +300,7 @@
           ];
           
           shellHook = ''
-            echo "🚀 Aider-Vertex v1.2.1 Environment Ready"
+            echo "🚀 Aider-Vertex v1.3.0 Environment Ready"
             echo "   Context Tools:"
             echo "     cc-targets <file>          - List build targets"
             echo "     cc-flags   <file> [regex]  - Inspect flags"
