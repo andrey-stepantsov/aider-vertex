@@ -1,5 +1,5 @@
 {
-  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.2.1)";
+  description = "Aider-Vertex: Gemini code editing with Vertex AI (v1.3.0)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -65,7 +65,7 @@
               echo "Usage: cc-flags <filename> [regex]"
               exit 1
             fi
-            FLAG_REGEX="''${2:-.*}"
+            FLAG_REGEX="${2:-.*}"
             ${pkgs.jq}/bin/jq -r --arg f "$1" --arg re "$FLAG_REGEX" '
               .[] | select(.file | contains($f)) |
               "==================================================",
@@ -100,6 +100,9 @@
             unstable = pkgs; 
           };
 
+          # --- DUAL OUTPUT STRATEGY ---
+          
+          # A. The Executable (App)
           app = p2n.mkPoetryApplication {
             projectDir = ./.;
             python = pkgs.python311;
@@ -112,8 +115,22 @@
             '';
           };
 
+          # B. The Environment (Interpreter + Libs)
+          # This is the "Open Brain" that makes /bin/python3 smart
+          pythonEnv = p2n.mkPoetryEnv {
+            projectDir = ./.;
+            python = pkgs.python311;
+            preferWheels = true;
+            overrides = p2n.defaultPoetryOverrides.extend myOverrides;
+            editablePackageSources = {
+              aider-vertex = ./.;
+            };
+          };
+
         in {
           default = app;
+          # Export both for local inspection
+          inherit app pythonEnv;
           inherit ctx-tool weave-view weave-headers cc-targets cc-flags cc-pick; 
 
           docker = pkgs.dockerTools.buildLayeredImage {
@@ -126,8 +143,8 @@
             '';
 
             contents = [ 
-              app
-              pkgs.python3
+              app         # The CLI tool (aider-vertex)
+              pythonEnv   # The Interpreter with libraries
               pkgs.cacert 
               pkgs.git 
               pkgs.openssh
@@ -191,6 +208,13 @@
               ln -sf ${pkgs.vim}/bin/vim /bin/vim
               ln -sf ${pkgs.neovim}/bin/nvim /bin/nvim
               
+              # 3. GLOBAL PYTHON EXPOSURE (The "Open Brain")
+              # Link the poetryEnv interpreter to standard paths
+              ln -sf ${pythonEnv}/bin/python /bin/python
+              ln -sf ${pythonEnv}/bin/python3 /bin/python3
+              ln -sf ${pythonEnv}/bin/python /usr/bin/python
+              ln -sf ${pythonEnv}/bin/python3 /usr/bin/python3
+              
               # Text Processing Symlinks
               ln -sf ${pkgs.gnugrep}/bin/grep /bin/grep
               ln -sf ${pkgs.gnused}/bin/sed /bin/sed
@@ -209,7 +233,7 @@
               ln -sf ${pkgs.coreutils}/bin/tail /bin/tail
               ln -sf ${pkgs.coreutils}/bin/chmod /bin/chmod
               
-              # 3. Mission Pack Support
+              # 4. Mission Pack Support
               mkdir -p /mission/bin
               chmod 755 /mission/bin
               
@@ -218,7 +242,7 @@
               mkdir -p /etc
               echo 'export PATH=$PATH:/mission/bin' >> /etc/bashrc
 
-              # 4. Git Ownership Fix
+              # 5. Git Ownership Fix
               echo "[safe]" > /etc/gitconfig
               echo "    directory = *" >> /etc/gitconfig
             '';
@@ -235,11 +259,13 @@
                 "TERM=xterm-256color"
                 "C_INCLUDE_PATH=${pkgs.glibc.dev}/include"
                 "CPLUS_INCLUDE_PATH=${pkgs.gcc.cc}/include/c++/${pkgs.gcc.version}"
+                # Failsafe: Ensure python sees its own site-packages if called raw
+                "PYTHONPATH=${pythonEnv}/${pythonEnv.sitePackages}"
               ];
             };
-          }; # <--- CORRECTED: Closes dockerTools.buildLayeredImage
-        } # <--- CORRECTED: Closes 'in {' set
-      ); # <--- CORRECTED: Closes forAllSystems
+          }; 
+        } 
+      );
 
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
