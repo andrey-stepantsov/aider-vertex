@@ -1,4 +1,4 @@
-# Aider-Vertex (v1.2.1)
+# Aider-Vertex (v1.3.0)
 
 **Aider-Vertex** is a specialized fork of [Aider](https://aider.chat) designed for high-performance, hermetic C/C++ development using Google's **Vertex AI (Gemini 2.5)** models.
 
